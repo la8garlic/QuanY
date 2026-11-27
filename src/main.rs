@@ -8,22 +8,25 @@ mod standby;
 mod storage;
 mod text;
 
-use std::{env, error::Error, path::PathBuf};
+use std::{env, error::Error};
 use tauri::Manager;
 
-fn workspace(app: &tauri::App) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+fn open_library(app: &tauri::App) -> Result<storage::Library, Box<dyn Error>> {
     let args: Vec<_> = env::args_os()
         .skip(1)
         .filter(|arg| arg != "--background")
         .collect();
     match args.as_slice() {
-        [] => Ok((
-            app.path().app_local_data_dir()?,
-            app.path().document_dir()?.join("泉涌"),
-        )),
+        [] => {
+            let documents = app.path().document_dir()?;
+            let mut library =
+                storage::Library::open(&app.path().app_local_data_dir()?, &documents.join("泉涌"))?;
+            files::upgrade_default_folder(library.db.get_mut().expect("稿本锁损坏"), &documents)?;
+            Ok(library)
+        }
         [flag, path] if flag == "--workspace" => {
             let dir = std::path::absolute(path)?;
-            Ok((dir.clone(), dir.join("文本")))
+            storage::Library::open(&dir, &dir.join("文本"))
         }
         _ => Err("用法：QuanY.exe [--workspace 稿件目录]".into()),
     }
@@ -41,9 +44,7 @@ fn main() {
     let result = builder
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
-            let library =
-                workspace(app).and_then(|(dir, texts)| storage::Library::open(&dir, &texts));
-            match library {
+            match open_library(app) {
                 Ok(library) => {
                     app.manage(library);
                 }

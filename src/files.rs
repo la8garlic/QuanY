@@ -17,6 +17,80 @@ pub fn folder(db: &Connection) -> rusqlite::Result<String> {
     })
 }
 
+/// 仅迁移旧系统默认目录中的直接关联文件；保留原件和原始基线，供恢复与外部修改检测。
+pub fn upgrade_default_folder(
+    db: &mut Connection,
+    documents: &Path,
+) -> std::result::Result<(), Box<dyn Error>> {
+    let old = documents.join("笺记");
+    let new = documents.join("泉涌");
+    let tx = db.transaction()?;
+    if !Path::new(&folder(&tx)?)
+        .as_os_str()
+        .eq_ignore_ascii_case(old.as_os_str())
+    {
+        return Ok(());
+    }
+    fs::create_dir_all(&new)?;
+    let mut links = tx.prepare("SELECT note,path FROM links ORDER BY note")?;
+    let rows = links
+        .query_map([], |r| {
+            Ok((r.get::<_, i64>(0)?, PathBuf::from(r.get::<_, String>(1)?)))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(links);
+    for (id, source) in rows {
+        if !source
+            .parent()
+            .is_some_and(|p| p.as_os_str().eq_ignore_ascii_case(old.as_os_str()))
+        {
+            continue;
+        }
+        let bytes = match fs::read(&source) {
+            Ok(data) => data,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e.into()),
+        };
+        let name = source.file_name().expect("关联文件有文件名");
+        for suffix in 0_u32.. {
+            let target = if suffix == 0 {
+                new.join(name)
+            } else {
+                new.join(format!("迁移-{id}-{suffix}-{}", name.to_string_lossy()))
+            };
+            let path = target.to_string_lossy();
+            if tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM links WHERE path=?1)",
+                [path.as_ref()],
+                |r| r.get::<_, bool>(0),
+            )? {
+                continue;
+            }
+            // 无覆盖地发布；若在文件落盘后、事务提交前退出，下次可复用同一份完整副本。
+            match staged(&new, &bytes)?.persist_noclobber(&target) {
+                Ok(_) => {}
+                Err(e) if e.error.kind() == io::ErrorKind::AlreadyExists => {
+                    if !target.is_file() || fs::read(&target)? != bytes {
+                        continue;
+                    }
+                }
+                Err(e) => return Err(e.error.into()),
+            }
+            tx.execute(
+                "UPDATE links SET path=?1 WHERE note=?2",
+                params![path.as_ref(), id],
+            )?;
+            break;
+        }
+    }
+    tx.execute(
+        "UPDATE save_options SET folder=?1 WHERE slot=1",
+        [new.to_string_lossy().as_ref()],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 pub fn change_folder(db: &Connection, path: &Path) -> Result<String> {
     if !path.is_absolute() {
         return Err("请输入完整目录，例如 D:\\写作。".into());

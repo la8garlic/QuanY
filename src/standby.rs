@@ -12,7 +12,8 @@ use winreg::{
 };
 
 const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-const VALUE: &str = "Jianji";
+const VALUE: &str = "QuanY";
+const LEGACY_VALUE: &str = "Jianji";
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 struct Geometry {
@@ -93,14 +94,36 @@ fn upgrade_startup_command() -> io::Result<()> {
         "\"{}\" --background",
         exe.with_file_name("笺记.exe").display()
     );
-    match run.get_value::<String, _>(VALUE) {
-        Ok(command) if command == previous => RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey_with_flags(RUN, KEY_SET_VALUE)?
-            .set_value(VALUE, &launch_command()?),
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+    let current = launch_command()?;
+    match run.get_value::<String, _>(LEGACY_VALUE) {
+        Ok(command) if command == previous || command == current => {}
+        Ok(_) => return Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
     }
+    match run.get_value::<String, _>(VALUE) {
+        Ok(command) if command != current => return Ok(()),
+        Ok(_) => {}
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    // 任务管理器按值名保存禁用状态，迁移时先复制该状态，再发布新的启动项。
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let approval_path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    match hkcu
+        .open_subkey(approval_path)
+        .and_then(|key| key.get_raw_value(LEGACY_VALUE))
+    {
+        Ok(state) => {
+            let key = hkcu.open_subkey_with_flags(approval_path, KEY_SET_VALUE)?;
+            key.set_raw_value(VALUE, &state)?;
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    let run = hkcu.open_subkey_with_flags(RUN, KEY_SET_VALUE)?;
+    run.set_value(VALUE, &current)?;
+    run.delete_value(LEGACY_VALUE)
 }
 
 fn startup_enabled() -> io::Result<bool> {

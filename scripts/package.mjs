@@ -15,4 +15,10 @@ try {
   target = `release/QuanY-${metadata.packages[0].version}.exe`;
   copyFileSync(exe, target);
 }
+// Explorer 可在原路径上继续使用上个版本的大图标；发布后通知 Shell 重新读取图像缓存。
+execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", [
+  "$ErrorActionPreference='Stop'",
+  "Add-Type -Namespace QuanY -Name Shell -MemberDefinition '[System.Runtime.InteropServices.DllImport(\"shell32.dll\")] public static extern void SHChangeNotify(int evt, uint flags, System.IntPtr first, System.IntPtr second);'",
+  "[QuanY.Shell]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)",
+].join("\n")], { windowsHide: true });
 console.log("已生成 " + target);
