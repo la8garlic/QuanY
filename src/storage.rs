@@ -7,11 +7,12 @@ use std::{
     error::Error,
     fs::{self, File},
     path::Path,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 pub struct Library {
     pub db: Mutex<Connection>,
+    files: Arc<Mutex<Connection>>,
     // 锁随进程释放，异常退出后无需清理标记文件。
     _writer: File,
 }
@@ -60,6 +61,20 @@ pub struct Desk {
 }
 
 impl Library {
+    /// TXT 读写串行；等待外部卷不占用便笺与检索的连接或异步执行线程。
+    pub async fn with_files<T: Send + 'static>(
+        &self,
+        action: impl FnOnce(&mut Connection) -> crate::files::Result<T> + Send + 'static,
+    ) -> Result<T, String> {
+        let files = Arc::clone(&self.files);
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut db = files.lock().expect("文件操作锁损坏");
+            action(&mut db).map_err(|e| e.to_string())
+        })
+        .await
+        .expect("文件操作线程异常退出")
+    }
+
     pub fn open(dir: &Path, texts: &Path) -> Result<Self, Box<dyn Error>> {
         fs::create_dir_all(dir)?;
         let writer = File::options()
@@ -78,11 +93,16 @@ impl Library {
             }
             Err(std::fs::TryLockError::Error(err)) => return Err(err.into()),
         }
-        let mut db = Connection::open(dir.join("notes.sqlite3"))?;
+        let open_connection = || -> rusqlite::Result<Connection> {
+            let mut db = Connection::open(dir.join("notes.sqlite3"))?;
+            db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;")?;
+            // 写事务先取得写入权，避免两条连接同时从读事务升级。
+            db.set_transaction_behavior(rusqlite::TransactionBehavior::Immediate);
+            Ok(db)
+        };
+        let mut db = open_connection()?;
         db.execute_batch(
-            "PRAGMA foreign_keys=ON;
-             PRAGMA synchronous=FULL;
-             CREATE TABLE IF NOT EXISTS notes (
+            "CREATE TABLE IF NOT EXISTS notes (
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, label TEXT NOT NULL, body TEXT NOT NULL,
                  modified INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER))
              );
@@ -124,6 +144,7 @@ impl Library {
         tx.commit()?;
         Ok(Self {
             db: Mutex::new(db),
+            files: Arc::new(Mutex::new(open_connection()?)),
             _writer: writer,
         })
     }
