@@ -15,6 +15,7 @@ let pending: Promise<void> | undefined;
 let quiet: number, deadline: number | undefined;
 let ready = false, busy = false;
 let path: string | null;
+let savedTitle: string, savedBody: string, txtPending: boolean;
 let folder: string;
 const confirm = el<HTMLDialogElement>("confirm");
 
@@ -34,6 +35,9 @@ function open(note: Note, clearSearch = false) {
   body.setSelectionRange(lastPlace.start, lastPlace.end);
   body.scrollTop = lastPlace.top;
   path = note.path;
+  savedTitle = note.title;
+  savedBody = note.body;
+  txtPending = note.pending;
   committed = 0;
   revision = note.pending ? 1 : 0;
   displayPath();
@@ -81,10 +85,19 @@ function saved(result: Saved) {
 async function write() {
   // 同一时刻仅允许一笔写入。等待磁盘时仍可输入，旧应答只确认它携带的版本。
   while (committed < revision) {
-    const version = revision, text = body.value;
+    const version = revision, text = body.value, name = title.value;
+    // 撤销回上次保存的内容时也跳过写盘；失败的写入仍需清理待写记录。
+    if (path && !txtPending && text === savedBody && name === savedTitle) {
+      committed = version;
+      continue;
+    }
     status("正在保存", "dirty");
     const place = position();
-    const result = await library.save({id:current, title:title.value, body:text, place});
+    txtPending = true;
+    const result = await library.save({id:current, title:name, body:text, place});
+    txtPending = false;
+    savedTitle = name;
+    savedBody = text;
     lastPlace = place;
     committed = version;
     saved(result);
@@ -233,7 +246,7 @@ el("open-file").onclick = () => action(async () => {
   body.focus();
 });
 el("save-file").onclick = () => action(async () => {
-  if (revision === committed) revision++;
+  if (!path && revision === committed) revision++;
   await flush();
   body.focus();
 }, false);
@@ -243,8 +256,13 @@ el("save-as").onclick = () => action(async () => {
   if (pending) await flush();
   try {
     const place = position();
-    const result = await library.saveAs({id:current, title:title.value, body:body.value, place}, revision !== committed);
+    const dirty = revision !== committed;
+    if (dirty) txtPending = true; // 打开选择器前，后端会先提交恢复稿。
+    const result = await library.saveAs({id:current, title:title.value, body:body.value, place}, dirty);
     if (result) {
+      txtPending = false;
+      savedTitle = title.value;
+      savedBody = body.value;
       committed = revision;
       lastPlace = place;
       saved(result);
