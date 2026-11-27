@@ -2,11 +2,11 @@ import { locale, onLanguageChange } from "./i18n";
 /** 直接查找纯文本偏移量，替换通过编辑控件完成，可使用 Ctrl+Z 撤销。 */
 import { writing, selectText, onTextChange } from "./writing";
 import { el } from "./view.js";
+import { LiteralIndex } from "./literal-index";
 
 const bar = el("findbar"), needle = el<HTMLInputElement>("needle");
 const replacement = el<HTMLInputElement>("replacement");
-// 稀疏记录匹配位置；跳转时只需在光标附近重走一小段，重叠词也与全部替换一致。
-let anchors: number[] = [], count = 0, last = -1, timer: number | undefined;
+let index: LiteralIndex | undefined, count = 0, timer: number | undefined;
 
 function enable(enabled: boolean) {
   for (const id of ["prev","next","replace-one","replace-all"]) el<HTMLButtonElement>(id).disabled = !enabled;
@@ -15,20 +15,9 @@ function enable(enabled: boolean) {
 function recount() {
   clearTimeout(timer);
   timer = undefined;
-  anchors = [];
-  count = 0;
-  last = -1;
-  const query = needle.value, text = writing.state.doc.toString();
-  if (query) {
-    let pos = text.indexOf(query);
-    let nextAnchor = 0;
-    while (pos >= 0) {
-      if (pos >= nextAnchor) { anchors.push(pos); nextAnchor = pos + 16384; }
-      last = pos;
-      count++;
-      pos = text.indexOf(query, pos + query.length);
-    }
-  }
+  const query = needle.value;
+  if (query !== index?.query) index = query ? new LiteralIndex(query) : undefined;
+  count = index ? index.count(writing.state.doc) : 0;
   el("matches").textContent = query ? count + (locale === "zh-CN" ? " 处" : count === 1 ? " match" : " matches") : "";
   enable(count > 0);
 }
@@ -41,18 +30,7 @@ function schedule() {
 }
 
 function nearest(edge: number, back: boolean) {
-  const text = writing.state.doc.toString(), query = needle.value;
-  let low = 0, high = anchors.length;
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    if (anchors[mid]! < edge) low = mid + 1; else high = mid;
-  }
-  let pos = anchors[Math.max(0, low - 1)]!, previous = last;
-  while (pos >= 0 && pos < edge) {
-    previous = pos;
-    pos = text.indexOf(query, pos + query.length);
-  }
-  return back ? previous : pos >= 0 ? pos : anchors[0]!;
+  return index!.nearest(writing.state.doc, edge, back);
 }
 
 function move(back: boolean) {
@@ -76,10 +54,11 @@ function replace(all: boolean) {
   if (!all) move(false);
 }
 
-export function resetFind() { clearTimeout(timer); timer = undefined; bar.hidden = true; anchors = []; }
+export function resetFind() { clearTimeout(timer); timer = undefined; bar.hidden = true; index = undefined; }
 export function openFind(forReplace: boolean) {
-  const selected = writing.state.sliceDoc(writing.state.selection.main.from, writing.state.selection.main.to);
-  if (selected && !selected.includes("\n")) needle.value = selected;
+  const { doc, selection } = writing.state;
+  const { from, to } = selection.main;
+  if (from < to && to <= doc.lineAt(from).to) needle.value = doc.sliceString(from, to);
   bar.hidden = false;
   recount();
   const field = forReplace && needle.value ? replacement : needle;
