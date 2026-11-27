@@ -34,7 +34,12 @@ fn main() {
         .and_then(|cwd| Launch::parse(env::args_os().skip(1), &cwd))
         .unwrap_or_else(|e| startup_error(&e));
     let visible = !launch.background || !launch.files.is_empty();
-    let mut builder = tauri::Builder::default().manage(OpenQueue(Mutex::new(launch.files)));
+    let mut builder = tauri::Builder::default()
+        // 所有编辑窗口在页面加载时统一关闭 WebView2 的浏览器右键菜单。
+        .append_invoke_initialization_script(
+            "\n;window.addEventListener('contextmenu', event => event.preventDefault(), true);",
+        )
+        .manage(OpenQueue(Mutex::new(launch.files)));
     if launch.workspace.is_none() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             // The sender already validated the arguments. Resolve relative paths against its cwd.
