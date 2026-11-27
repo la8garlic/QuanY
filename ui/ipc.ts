@@ -49,6 +49,8 @@ export const library = {
   save: (note: Snapshot) => invoke<Saved>("save_note", { note }),
   bookmark: (id: number, place: Place) => invoke<void>("bookmark", { id, place }),
   remove: (id: number) => invoke<Desk>("delete_note", { id }),
+  hasShellFiles: () => invoke<boolean>("has_shell_files"),
+  openNextTxt: () => invoke<Desk | null>("open_next_txt"),
   open: () => invoke<Desk|null>("open_text"),
   saveAs: (note:Snapshot, dirty:boolean) => invoke<Saved|null>("save_as",{note,dirty}),
   chooseFolder: () => invoke<string|null>("choose_folder"),
@@ -63,6 +65,8 @@ export type Bindings=Record<GlobalTarget,Binding>;
 export interface Binding {key:string;issue:string|null}
 /** 桌面设置的应答反映实际系统注册结果。 */
 export const standby = {
+  registerTxt: () => invoke<void>("register_txt_handler"),
+  openDefaultApps: () => invoke<void>("open_default_apps"),
   setLanguage: (english: boolean) => invoke<void>("set_language", { english }),
   read: () => invoke<{bindings:Bindings;autostart:boolean;compact:boolean}>("standby_settings"),
   startup: (enabled:boolean) => invoke<boolean>("set_autostart",{enabled}),

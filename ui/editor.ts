@@ -23,7 +23,7 @@ function errorMessage(error: unknown, retry?: () => void) {
   el("error").hidden = false;
   el("retry").dataset.retry = String(!!retry);
   el("retry").textContent = t(retry ? "重试" : "知道了");
-  el("retry").onclick = () => { el("error").hidden = true; retry?.(); };
+  el("retry").onclick = () => { el("error").hidden = true; if (retry) retry(); else void drainShellFiles(); };
 }
 
 function open(note: Note, clearSearch = false) {
@@ -114,7 +114,7 @@ async function flush() {
 }
 
 function autoSave() {
-  void flush();
+  void flush().then(saved => { if (saved) void drainShellFiles(); });
 }
 
 function changed() {
@@ -173,8 +173,31 @@ async function action(task: () => Promise<void>, saveFirst = true) {
     errorMessage(error);
   } finally {
     title.readOnly = body.readOnly = busy = false;
+    void drainShellFiles();
   }
 }
+
+let shellPending = false, draining = false, composing = false;
+// An Explorer launch may arrive during IME input, a modal dialog, or an in-flight save.
+async function drainShellFiles() {
+  if (!shellPending || !ready || busy || draining || composing || document.querySelector("dialog[open]")) return;
+  draining = true;
+  shellPending = false;
+  const opened = await action(async () => {
+    await standby.display(false);
+    quickLayout(false);
+    let desk: Desk | null;
+    while ((desk = await library.openNextTxt()) !== null) show(desk);
+    body.focus();
+  });
+  draining = false;
+  if (!opened) { shellPending = true; return; }
+  if (shellPending) void drainShellFiles();
+}
+function requestShellOpen() { shellPending = true; void drainShellFiles(); }
+document.addEventListener("compositionstart", () => { composing = true; });
+document.addEventListener("compositionend", () => { composing = false; setTimeout(drainShellFiles, 0); });
+document.addEventListener("close", () => { queueMicrotask(drainShellFiles); }, true);
 
 export function createManuscript(name: string) {
   return action(async () => {
@@ -300,7 +323,10 @@ async function boot() {
     initKeys(prefs.bindings,prefs.autostart);
     quickLayout(prefs.compact);
     for(const b of Object.values(prefs.bindings))if(b.issue)errorMessage(b.issue);
-    await desktop.listen<Intent>("standby-action", e=>{void dispatch(e.payload);});
+    await desktop.listen<Intent | "open-files">("standby-action", e => {
+      if (e.payload === "open-files") requestShellOpen();
+      else void dispatch(e.payload);
+    });
     await desktop.onCloseRequested(async e => {
       e.preventDefault();
       await dispatch(el<HTMLInputElement>("resident").checked ? "hide":"quit");
@@ -308,6 +334,8 @@ async function boot() {
     title.disabled = body.disabled = false;
     ready = true;
     body.focus();
+    if (await library.hasShellFiles() || shellPending) requestShellOpen();
+    void standby.registerTxt().catch(e => errorMessage(e));
   } catch (error) {
     status("稿本未打开", "error");
     errorMessage(error, boot);

@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 const english = {
+  "TXT 默认打开方式": "Default app for TXT files",
+  "在 Windows 中设置…": "Choose in Windows…",
   "手稿详情": "Draft details",
   "关闭详情": "Close details",
   "未命名手稿": "Untitled draft",

@@ -1,6 +1,6 @@
 {
   "productName": "泉涌",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "identifier": "cn.jianji.writer",
   "build": { "frontendDist": "dist", "beforeBuildCommand": "npm run build" },
   "app": {
