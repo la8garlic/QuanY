@@ -1,3 +1,4 @@
+import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Entry } from "./ipc";
 import { manuscriptStats } from "./statistics";
@@ -39,8 +40,8 @@ export function DetailsDialog({
     >
       <header>
         <h2 id="details-heading">手稿详情</h2>
-        <button aria-label="关闭详情" onClick={() => ref.current!.close()}>
-          ×
+        <button className="control-close" aria-label="关闭详情" onClick={() => ref.current!.close()}>
+          <X aria-hidden="true" />
         </button>
       </header>
       <p className="entry-name">{entry.title || "未命名手稿"}</p>
@@ -72,6 +73,7 @@ export function DetailsDialog({
           <input
             id="detail-pin"
             type="checkbox"
+            role="switch"
             checked={pinned}
             onChange={(e) => setPinned(e.target.checked)}
           />
@@ -159,8 +161,8 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
     >
       <header>
         <h2>快速切稿</h2>
-        <button aria-label="关闭快速切稿" onClick={() => ref.current!.close()}>
-          ×
+        <button className="control-close" aria-label="关闭快速切稿" onClick={() => ref.current!.close()}>
+          <X aria-hidden="true" />
         </button>
       </header>
       <input
@@ -198,7 +200,7 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
             key={n.id}
             onClick={() => void choose(i)}
           >
-            <i aria-hidden="true">&#xE8A5;</i>
+            <FileText aria-hidden="true" />
             {n.title || "未命名手稿"}
           </button>
         ))}

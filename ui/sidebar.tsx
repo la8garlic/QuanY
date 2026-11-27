@@ -1,3 +1,4 @@
+import { FileText, Pin, Plus, Search, Settings2, StickyNote } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { library, type Entry, type SearchHit } from "./ipc";
 
@@ -80,11 +81,11 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
         </span>
         <strong>笺记</strong>
         <button id="new" aria-label="新建手稿" title="新建手稿">
-          <i aria-hidden="true">&#xE710;</i>
+          <Plus aria-hidden="true" />
         </button>
       </header>
       <label className="library-search">
-        <i aria-hidden="true">&#xE721;</i>
+        <Search aria-hidden="true" />
         <input
           id="search"
           type="search"
@@ -143,9 +144,11 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
               title={entry.title || "未命名手稿"}
               aria-current={entry.id === current ? "page" : undefined}
             >
-              <i className="note-symbol" aria-hidden="true">
-                {entry.pinned ? "\uE718" : "\uE8A5"}
-              </i>
+              {entry.pinned ? (
+                <Pin className="note-symbol" aria-hidden="true" />
+              ) : (
+                <FileText className="note-symbol" aria-hidden="true" />
+              )}
               <strong>{entry.title || "未命名手稿"}</strong>
               <time dateTime={new Date(entry.modified).toISOString()}>
                 {modifiedLabel(entry.modified)}
@@ -168,10 +171,11 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
       </nav>
       <div className="side-tools">
         <button id="memos">
-          <i aria-hidden="true">&#xE70B;</i>独立便笺
+          <StickyNote aria-hidden="true" />
+          独立便笺
         </button>
         <button id="options" aria-haspopup="dialog" title="设置" aria-label="设置">
-          <i aria-hidden="true">&#xE713;</i>
+          <Settings2 aria-hidden="true" />
         </button>
       </div>
     </aside>

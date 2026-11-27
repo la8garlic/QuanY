@@ -22,7 +22,7 @@ export function status(text: string, state = "saved") {
 export function setFocusMode(on: boolean) {
   document.body.classList.toggle("focused", on);
   el("focus").setAttribute("aria-pressed", String(on));
-  el("focus").textContent = on ? "退出专注" : "专注";
+  el("focus-label").textContent = on ? "退出专注" : "专注";
   body.focus();
 }
 

@@ -249,7 +249,7 @@ confirm.onclose = () => {
 function isQuick() { return document.body.classList.contains("quick"); }
 function quickLayout(on:boolean) {
   document.body.classList.toggle("quick",on);
-  el("quick-toggle").textContent=on?"展开主窗口":"速记窗";
+  el("quick-label").textContent=on?"展开主窗口":"速记窗";
 }
 type Intent="quick"|"full"|"quit"|"hide";
 function dispatch(intent:Intent) {

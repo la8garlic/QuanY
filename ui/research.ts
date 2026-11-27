@@ -159,10 +159,12 @@ export function initResearch(
   }
   el("reference-open").onclick = () => {
     ref.hidden = !ref.hidden;
+    el("reference-open").setAttribute("aria-pressed", String(!ref.hidden));
     if (!ref.hidden) refOptions();
   };
   el("ref-close").onclick = () => {
     ref.hidden = true;
+    el("reference-open").setAttribute("aria-pressed", "false");
     body.focus();
   };
   choice.onchange = () => void readRef().catch(report);

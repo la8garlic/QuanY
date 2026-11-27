@@ -1,3 +1,19 @@
+import {
+  ArchiveX,
+  BookOpen,
+  ChevronDown,
+  Columns2,
+  FilePenLine,
+  FolderOpen,
+  History,
+  Maximize,
+  PanelTop,
+  Save,
+  FileOutput,
+  Search,
+  Tags,
+  X,
+} from "lucide-react";
 import { createRoot } from "react-dom/client";
 import { useEffect, useMemo, useState } from "react";
 import type { Entry } from "./ipc";
@@ -16,36 +32,69 @@ function WritingDesk({
   return (
     <main>
       <header className="bar">
-        <button id="quick-new">新便笺</button>
+        <button id="quick-new">
+          <FilePenLine aria-hidden="true" />
+          新便笺
+        </button>
         <details id="file-menu">
           <summary title="文件操作">
-            <i aria-hidden="true">&#xE8B7;</i> 文件 <span aria-hidden="true">⌄</span>
+            <FolderOpen aria-hidden="true" />
+            文件
+            <ChevronDown className="chevron" aria-hidden="true" />
           </summary>
           <div>
-            <button id="save-file">保存</button>
-            <button id="open-file">打开 TXT…</button>
-            <button id="save-as">另存为…</button>
-            <button id="remove">移出稿本…</button>
+            <button id="save-file">
+              <Save />
+              保存
+              <kbd data-shortcut="save" />
+            </button>
+            <button id="open-file">
+              <FolderOpen />
+              打开 TXT…
+              <kbd data-shortcut="open" />
+            </button>
+            <button id="save-as">
+              <FileOutput />
+              另存为…
+              <kbd data-shortcut="saveAs" />
+            </button>
+            <button id="remove">
+              <ArchiveX />
+              移出稿本…
+            </button>
           </div>
         </details>
 
         <button id="switch-open" className="switch-launch" onClick={openSwitch} title="快速切稿">
-          <i aria-hidden="true">&#xE8FD;</i> 快速切稿
+          <BookOpen aria-hidden="true" />
+          快速切稿
         </button>
         <span className="spacer"></span>
-        <button className="icon-tool" id="find-open" aria-label="查找">
-          <i aria-hidden="true">&#xE721;</i>
-        </button>
-        <button className="icon-tool" id="history-open" title="版本历史" aria-label="版本历史">
-          <i aria-hidden="true">&#xE81C;</i>
-        </button>
-        <button className="icon-tool" id="reference-open" title="并排参考" aria-label="并排参考">
-          <i aria-hidden="true">&#xE8A9;</i>
-        </button>
+        <div className="tool-group" role="group" aria-label="查阅工具">
+          <button className="icon-tool" id="find-open" aria-label="查找">
+            <Search aria-hidden="true" />
+          </button>
+          <button className="icon-tool" id="history-open" title="版本历史" aria-label="版本历史">
+            <History aria-hidden="true" />
+          </button>
+          <button
+            className="icon-tool"
+            id="reference-open"
+            aria-pressed="false"
+            title="并排参考"
+            aria-label="并排参考"
+          >
+            <Columns2 aria-hidden="true" />
+          </button>
+        </div>
         <button id="focus" aria-pressed="false">
-          专注
+          <Maximize aria-hidden="true" />
+          <span id="focus-label">专注</span>
         </button>
-        <button id="quick-toggle">速记窗</button>
+        <button id="quick-toggle">
+          <PanelTop aria-hidden="true" />
+          <span id="quick-label">速记窗</span>
+        </button>
         <button id="stow">收起</button>
       </header>
       <section id="findbar" aria-label="正文查找与替换" hidden>
@@ -59,7 +108,7 @@ function WritingDesk({
             下一个
           </button>
           <button id="find-close" aria-label="关闭查找">
-            ×
+            <X aria-hidden="true" />
           </button>
         </div>
         <div>
@@ -83,7 +132,8 @@ function WritingDesk({
               onClick={openDetails}
               disabled={!entry}
             >
-              <i aria-hidden="true">&#xE8EC;</i> 手稿详情
+              <Tags aria-hidden="true" />
+              手稿详情
             </button>
           </div>
           <input id="title" aria-label="手稿标题" placeholder="未命名手稿" autoComplete="off" disabled />
@@ -100,7 +150,7 @@ function WritingDesk({
           <header>
             <label htmlFor="ref-choice">参考稿</label>
             <button id="ref-close" aria-label="关闭参考稿">
-              ×
+              <X aria-hidden="true" />
             </button>
           </header>
           <select id="ref-choice" aria-label="选择参考稿"></select>

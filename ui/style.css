@@ -14,6 +14,11 @@
   --stamp: #a65036;
   --active: #e8d9c9;
   --danger: #a03828;
+  --control: #fffefa;
+  --control-border: #d7d0c5;
+  --control-tray: #eeeae2;
+  --control-shadow: 0 1px 2px #382c2010;
+  --switch-off: #837d74;
   --text-size: 20px;
   --leading: 1.75;
   --writing: "Noto Serif SC", "SimSun", serif;
@@ -39,6 +44,11 @@
   --accent: #e3a388;
   --active: #4c3b30;
   --danger: #f29c8a;
+  --control: #302f2d;
+  --control-border: #56534e;
+  --control-tray: #292826;
+  --control-shadow: 0 1px 2px #0004;
+  --switch-off: #77736c;
 }
 #root {
   display: contents;
@@ -85,6 +95,27 @@ summary {
   border-radius: 5px;
   padding: 7px 11px;
   background: transparent;
+}
+svg.lucide {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
+  flex-shrink: 0;
+  vertical-align: middle;
+  pointer-events: none;
+}
+button,
+summary,
+select {
+  transition:
+    background-color 0.13s,
+    border-color 0.13s,
+    box-shadow 0.13s,
+    color 0.13s;
+}
+button:not(:disabled):active,
+summary:active {
+  background: var(--active);
 }
 button:hover,
 summary:hover {
@@ -145,17 +176,23 @@ aside {
   margin-left: auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  color: var(--side-ink);
-  border: 1px solid var(--line);
-  background: var(--paper);
-  border-radius: 8px;
+  color: #fff;
+  background: var(--stamp);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: var(--control-shadow);
 }
 #new:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--stamp) 88%, black);
+}
+#new:active {
+  background: color-mix(in srgb, var(--stamp) 74%, black);
+}
+#new svg {
+  stroke-width: 2.2;
 }
 button i {
   margin: 0;
@@ -165,14 +202,16 @@ button i {
   align-items: center;
   gap: 9px;
   background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 10px;
+  border: 1px solid var(--control-border);
+  box-shadow: var(--control-shadow);
+  border-radius: 9px;
+  padding: 8px 10px;
   color: var(--side-muted);
   margin: 0 4px 25px;
 }
-.library-search i {
-  font-size: 14px;
+.library-search svg {
+  width: 16px;
+  height: 16px;
 }
 #search {
   min-width: 0;
@@ -188,6 +227,7 @@ button i {
 }
 .library-search:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .catalog-controls {
   display: flex;
@@ -201,9 +241,9 @@ button i {
   min-width: 0;
   max-width: 48%;
   border: 0;
-  border-radius: 5px;
-  padding: 3px 0;
-  background: var(--side);
+  border-radius: 6px;
+  padding: 5px 4px;
+  background: transparent;
   color: inherit;
   font-size: 12px;
 }
@@ -231,6 +271,9 @@ button i {
   color: var(--accent);
 }
 #details-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--muted);
   font-size: 12px;
   border-left: 1px solid var(--line);
@@ -241,9 +284,9 @@ button i {
   color: var(--accent);
   background: transparent;
 }
-#details-open i,
-.switch-launch i {
-  font-size: 13px;
+#details-open svg {
+  width: 14px;
+  height: 14px;
 }
 #stats-open {
   flex-shrink: 0;
@@ -276,7 +319,7 @@ button i {
   align-items: center;
 }
 .catalog-dialog header button {
-  background: none;
+  background: transparent;
   font-size: 20px;
   padding: 0 7px;
   color: var(--muted);
@@ -381,7 +424,7 @@ button i {
   .catalog-controls select {
     max-width: 78%;
   }
-  .switch-launch i {
+  .switch-launch svg {
     display: none;
   }
   .stats-grid dd {
@@ -418,7 +461,8 @@ button i {
   background: var(--active);
 }
 .note-symbol {
-  font-size: 15px;
+  width: 16px;
+  height: 16px;
   color: var(--side-muted);
 }
 #notes button[aria-current="page"] .note-symbol {
@@ -474,65 +518,103 @@ main {
 }
 .bar button,
 .bar summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  border-radius: 8px;
   font-size: 13px;
   white-space: nowrap;
-  border-radius: 7px;
-}
-.bar summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.icon-tool {
-  display: grid;
-  place-items: center;
-  width: 33px;
-  height: 33px;
-  padding: 0;
+  line-height: 1;
 }
 .bar .spacer {
   flex: 1;
 }
-#focus {
-  margin-left: 3px;
-  border-left: 1px solid var(--line);
-  border-radius: 0;
-  padding-left: 15px;
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--control-tray);
+  border-radius: 10px;
 }
-#focus[aria-pressed="true"] {
+.bar .icon-tool {
+  width: 31px;
+  height: 29px;
+  padding: 0;
+  border-radius: 7px;
+}
+.tool-group .icon-tool:hover {
+  background: var(--control);
+  box-shadow: var(--control-shadow);
+}
+.bar button[aria-pressed="true"] {
+  background: var(--control);
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    var(--control-shadow);
   color: var(--accent);
 }
-
+#focus {
+  margin-left: 5px;
+}
 #file-menu {
   position: relative;
 }
 #file-menu summary {
   list-style: none;
+  padding-inline: 10px;
+}
+#file-menu .chevron {
+  width: 13px;
+  height: 13px;
+}
+#file-menu[open] summary {
+  background: var(--control-tray);
+  color: var(--ink);
 }
 #file-menu > div {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 5px);
   left: 0;
-  z-index: 3;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  box-shadow: 0 6px 18px #0002;
+  z-index: 4;
+  background: var(--control);
+  border: 1px solid var(--control-border);
+  box-shadow: 0 8px 24px #211b1526;
   padding: 5px;
-  width: 145px;
-  border-radius: 7px;
+  width: 228px;
+  border-radius: 12px;
 }
 #file-menu button {
-  display: block;
   width: 100%;
+  justify-content: flex-start;
   text-align: left;
+  padding: 0 10px;
+  gap: 10px;
 }
+#file-menu kbd {
+  margin-left: auto;
+  color: var(--muted);
+  font:
+    11px "Segoe UI",
+    sans-serif;
+}
+#file-menu #remove {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 7px 7px;
+  margin-top: 4px;
+}
+
 #remove,
 .danger {
   color: var(--danger);
 }
 #quick-toggle {
   margin-left: 4px;
-  background: var(--side);
+  background: var(--control);
+  border: 1px solid var(--control-border);
+  box-shadow: var(--control-shadow);
   color: var(--side-ink);
 }
 #desk-pages {
@@ -690,6 +772,118 @@ select {
   border: 1px solid var(--line);
   padding: 5px 8px;
 }
+
+/* 保留 select 的系统键盘导航，在支持可定制选择器的 WebView2 中绘制菜单。 */
+select,
+.details-form input:not([type="checkbox"]),
+#switch-query,
+.folder-row input,
+#findbar input {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control);
+  color: var(--ink);
+  box-shadow: var(--control-shadow);
+}
+select:hover,
+.folder-row input:hover,
+#findbar input:hover,
+.details-form input:not([type="checkbox"]):hover {
+  border-color: color-mix(in srgb, var(--muted) 72%, var(--control-border));
+}
+select:focus-visible,
+#switch-query:focus-visible,
+.folder-row input:focus-visible,
+#findbar input:focus-visible,
+.details-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.catalog-controls select {
+  box-shadow: none;
+  min-height: 28px;
+}
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    align-items: center;
+    gap: 8px;
+  }
+  select::picker-icon {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin: 0 3px 3px 5px;
+    border: solid currentColor;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+    color: var(--muted);
+  }
+  select:open::picker-icon {
+    transform: rotate(225deg);
+    margin-bottom: -3px;
+  }
+  ::picker(select) {
+    padding: 4px;
+    margin-block: 4px;
+    max-height: min(300px, 60vh);
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--control);
+    color: var(--ink);
+    box-shadow: 0 7px 24px #211b1528;
+  }
+  option {
+    padding: 6px 9px;
+    min-height: 30px;
+    align-items: center;
+    gap: 8px;
+    border-radius: 6px;
+    font: inherit;
+  }
+  option:hover,
+  option:focus {
+    background: var(--control-tray);
+  }
+  option:checked {
+    background: var(--selected);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+  }
+  optgroup legend {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 5px 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  summary,
+  select,
+  input[role="switch"],
+  input[role="switch"]::before {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  input[role="switch"] {
+    appearance: auto;
+    width: 21px;
+    height: 21px;
+  }
+  input[role="switch"]::before {
+    content: none;
+  }
+}
 #findbar input,
 .folder-row input,
 .history-tools select {
@@ -738,13 +932,63 @@ dialog form {
 dialog form {
   justify-content: flex-end;
 }
-dialog header button,
+dialog button,
+#findbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+dialog form button,
 .folder-row button,
 .history-tools button,
 #create-memo,
-#restore {
-  background: var(--selected);
+#restore,
+#reset-keys,
+#findbar button {
+  background: var(--control);
+  border: 1px solid var(--control-border);
+  box-shadow: var(--control-shadow);
 }
+dialog button.control-primary,
+dialog button.apply,
+#create-memo {
+  background: var(--stamp);
+  color: #fff;
+  border: 1px solid transparent;
+  padding-inline: 13px;
+  white-space: nowrap;
+}
+dialog button.control-primary:hover,
+dialog button.apply:hover,
+#create-memo:hover {
+  background: color-mix(in srgb, var(--stamp) 86%, black);
+}
+dialog button.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+}
+dialog header button.control-close,
+#ref-close,
+#find-close {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+  color: var(--muted);
+}
+dialog header button.control-close:hover,
+#ref-close:hover,
+#find-close:hover {
+  background: var(--control-tray);
+  color: var(--ink);
+}
+
 #panel {
   width: min(550px, 94vw);
   padding: 0;
@@ -754,19 +998,35 @@ dialog header button,
 }
 .settings-tabs {
   display: flex;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 3px;
+  padding: 4px;
+  margin: 3px 22px 0;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--control-tray);
 }
 .settings-tabs button {
-  padding: 9px 10px;
-  border-radius: 0;
-  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 6px;
+  gap: 6px;
   font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+}
+.settings-tabs button svg {
+  width: 15px;
+  height: 15px;
 }
 .settings-tabs button[aria-pressed="true"] {
+  background: var(--control);
   color: var(--accent);
-  box-shadow: inset 0 -2px var(--accent);
+  border: 1px solid var(--control-border);
+  box-shadow: var(--control-shadow);
+  font-weight: 600;
 }
+
 #panel section {
   padding: 18px 22px 22px;
 }
@@ -774,7 +1034,7 @@ dialog header button,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 40px;
+  min-height: 46px;
   gap: 7px;
 }
 .setting span {
@@ -786,18 +1046,104 @@ dialog header button,
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px 20px;
 }
+#bindings {
+  grid-template-columns: 1fr;
+}
 .keycap {
-  border: 1px solid var(--line);
+  min-width: 96px;
+  gap: 4px;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--muted);
   font:
-    13px Consolas,
+    11px/1.35 "Segoe UI",
     sans-serif;
-  min-width: 99px;
 }
-input[type="checkbox"] {
-  accent-color: var(--accent);
-  width: 17px;
-  height: 17px;
+.keycap:hover {
+  background: var(--control-tray);
 }
+.keycap kbd {
+  display: grid;
+  place-items: center;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 5px;
+  border: 1px solid var(--control-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--control);
+  color: var(--ink);
+  font:
+    12px "Segoe UI",
+    sans-serif;
+}
+.keycap[data-listening="true"] {
+  background: var(--selected);
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+}
+input[role="switch"] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 21px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: var(--switch-off);
+  cursor: pointer;
+  transition: background-color 0.14s;
+}
+input[role="switch"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  height: 15px;
+  width: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #0004;
+  transition: transform 0.14s;
+}
+input[role="switch"]:checked {
+  background: var(--stamp);
+}
+input[role="switch"]:checked::before {
+  transform: translateX(15px);
+}
+input[role="switch"]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--control);
+  box-shadow: var(--control-shadow);
+}
+.stepper button {
+  min-height: 26px;
+  width: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+}
+.stepper #size {
+  min-width: 32px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stepper svg {
+  width: 14px;
+  height: 14px;
+}
+
 #key-list {
   margin-top: 12px;
 }
@@ -889,13 +1235,13 @@ body.quick #reference {
   display: none;
 }
 body.quick :is(#quick-new, #stow) {
-  display: block;
+  display: inline-flex;
 }
 body.quick .bar > :not(#quick-new, #quick-toggle, #stow, .spacer) {
   display: none;
 }
 body.quick .bar {
-  height: 34px;
+  height: 40px;
   padding: 0 9px;
 }
 body.quick #desk-pages {
@@ -1001,6 +1347,9 @@ body.memo-window {
   }
   .brand {
     margin-left: 4px;
+  }
+  .settings-tabs button svg {
+    display: none;
   }
   .settings-grid {
     grid-template-columns: 1fr;

@@ -21,14 +21,28 @@ function combo(e:KeyboardEvent) {
   if (!/^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|Comma|Space)$/.test(key)) return "";
   return [e.ctrlKey && "Ctrl",e.altKey && "Alt",e.shiftKey && "Shift",e.metaKey && "Super",key==="Comma" ? "," : key].filter(Boolean).join("+");
 }
+/** 键帽按物理组合拆开，候录状态仍在原按钮内，键盘焦点不会跳走。 */
+function keycaps(id:string, chord:string, listening:boolean) {
+  const button=el<HTMLButtonElement>(id);
+  button.dataset.listening=String(listening);
+  if(listening || !chord) { button.textContent=listening ? "请按组合键…" : "未分配"; return; }
+  const fragment=document.createDocumentFragment();
+  chord.split("+").forEach((key,i)=>{
+    if(i)fragment.append("+");
+    const cap=document.createElement("kbd");
+    cap.textContent=key;fragment.append(cap);
+  });
+  button.replaceChildren(fragment);
+}
 function draw() {
   for (const a of actions) {
-    el("key-"+a).textContent = recording===a ? "请按组合键…" : bindings[a] || "未分配";
+    keycaps("key-"+a,bindings[a],recording===a);
     el(targets[a]).title = labels[a]+(bindings[a] ? "（"+bindings[a]+"）" : "");
   }
   el("find-open").title = "查找（"+bindings.find+"） / 替换（"+bindings.replace+"）";
-  el("summon-key").textContent = recording==="summon" ? "请按组合键…" : globalKeys.quick.key;
-  el("main-key").textContent = recording==="main" ? "请按组合键…" : globalKeys.main.key;
+  keycaps("summon-key",globalKeys.quick.key,recording==="summon");
+  keycaps("main-key",globalKeys.main.key,recording==="main");
+  for(const hint of document.querySelectorAll<HTMLElement>("[data-shortcut]")) hint.textContent=bindings[hint.dataset.shortcut as Action];
 }
 function remember() {
   for (const a of actions) localStorage.setItem("key-"+a,bindings[a]);

@@ -1,8 +1,9 @@
+import { Check, Folder, Keyboard, Minus, Paintbrush, Plus, X } from "lucide-react";
 import { useState } from "react";
 const sections = [
-  ["system", "待命与快捷键"],
-  ["files", "文件与保存"],
-  ["writing", "写作外观"],
+  ["system", "待命与快捷键", Keyboard],
+  ["files", "文件与保存", Folder],
+  ["writing", "写作外观", Paintbrush],
 ] as const;
 function Settings() {
   const [page, setPage] = useState<string>("system");
@@ -11,12 +12,16 @@ function Settings() {
       <header>
         <h2 id="settings-title">设置</h2>
         <form method="dialog">
-          <button aria-label="关闭设置">完成</button>
+          <button className="control-primary" aria-label="关闭设置">
+            <Check aria-hidden="true" />
+            完成
+          </button>
         </form>
       </header>
       <div className="settings-tabs" aria-label="设置分类">
-        {sections.map(([key, label]) => (
+        {sections.map(([key, label, Icon]) => (
           <button key={key} data-page={key} aria-pressed={page === key} onClick={() => setPage(key)}>
+            <Icon aria-hidden="true" />
             {label}
           </button>
         ))}
@@ -25,11 +30,11 @@ function Settings() {
         <h3>随时待命</h3>
         <label className="setting">
           关闭窗口后保留在托盘
-          <input id="resident" type="checkbox" />
+          <input id="resident" type="checkbox" role="switch" />
         </label>
         <label className="setting">
           登录 Windows 后在托盘启动
-          <input id="autostart" type="checkbox" />
+          <input id="autostart" type="checkbox" role="switch" />
         </label>
         <div className="setting">
           <span>全局打开主窗口</span>
@@ -54,7 +59,9 @@ function Settings() {
         <div className="folder-row">
           <input id="folder" spellCheck={false} />
           <button id="browse">浏览…</button>
-          <button id="apply-folder">应用</button>
+          <button className="control-primary" id="apply-folder">
+            应用
+          </button>
         </div>
         <p id="folder-info" role="status">
           新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。
@@ -81,13 +88,15 @@ function Settings() {
           </label>
           <div className="setting">
             <span>字号</span>
-            <button id="smaller" aria-label="减小字号">
-              −
-            </button>
-            <output id="size"></output>
-            <button id="larger" aria-label="增大字号">
-              ＋
-            </button>
+            <div className="stepper" role="group" aria-label="字号">
+              <button id="smaller" aria-label="减小字号">
+                <Minus aria-hidden="true" />
+              </button>
+              <output id="size"></output>
+              <button id="larger" aria-label="增大字号">
+                <Plus aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <label className="setting">
             行距
@@ -113,7 +122,7 @@ function Settings() {
           </label>
           <label className="setting">
             自动换行
-            <input id="wrap" type="checkbox" />
+            <input id="wrap" type="checkbox" role="switch" />
           </label>
         </div>
       </section>
@@ -126,8 +135,8 @@ export function Dialogs() {
       <dialog id="history" className="work-dialog">
         <header>
           <h2>版本历史</h2>
-          <button id="history-close" aria-label="关闭历史">
-            ×
+          <button className="control-close" id="history-close" aria-label="关闭历史">
+            <X aria-hidden="true" />
           </button>
         </header>
         <div className="history-tools">
@@ -146,7 +155,9 @@ export function Dialogs() {
         <header>
           <h2>独立便笺</h2>
           <form method="dialog">
-            <button aria-label="关闭便笺列表">×</button>
+            <button className="control-close" aria-label="关闭便笺列表">
+              <X aria-hidden="true" />
+            </button>
           </form>
         </header>
         <div id="memo-items"></div>
