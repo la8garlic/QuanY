@@ -55,10 +55,15 @@ export function settings(onDirectory: (value: string) => void) {
   el("browse").onclick = () => updateFolder(true);
   el("apply-folder").onclick = () => updateFolder(false);
   input.onkeydown = e => { if (e.key === "Enter") el("apply-folder").click(); };
-  const controls = ["font","theme","delay","leading","width"].map(id=>el<HTMLSelectElement>(id));
+  const controls = ["font","delay"].map(id=>el<HTMLSelectElement>(id));
   for (const control of controls) {
     const value = localStorage.getItem(control.id);
     if (Array.from(control.options).some(o => o.value === value)) control.value = value!;
+  }
+  // 保留已保存的偏好键，原生单选框负责方向键导航。
+  const choices = Array.from(panel.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+  for (const choice of choices) {
+    if (localStorage.getItem(choice.name) === choice.value) choice.checked = true;
   }
   const wrap = el<HTMLInputElement>("wrap");
   wrap.checked = localStorage.getItem("wrap") !== "off";
@@ -66,7 +71,12 @@ export function settings(onDirectory: (value: string) => void) {
   if (!Number.isInteger(size) || size < 12 || size > 36) size = 20;
   function apply() {
     for (const control of controls) root.dataset[control.id] = control.value;
-    root.style.setProperty("--leading", el<HTMLSelectElement>("leading").value);
+    for (const choice of choices) {
+      if (choice.checked) {
+        root.dataset[choice.name] = choice.value;
+        if (choice.name === "leading") root.style.setProperty("--leading", choice.value);
+      }
+    }
     root.style.setProperty("--text-size", size + "px");
     body.wrap = wrap.checked ? "soft" : "off";
     el("size").textContent = String(size);
@@ -76,12 +86,13 @@ export function settings(onDirectory: (value: string) => void) {
   function remember() {
     apply();
     for (const control of controls) localStorage.setItem(control.id,control.value);
+    for (const choice of choices) if (choice.checked) localStorage.setItem(choice.name, choice.value);
     localStorage.setItem("wrap",wrap.checked ? "soft" : "off");
     localStorage.setItem("size",String(size));
   }
   el("smaller").onclick = () => { size -= 2; remember(); };
   el("larger").onclick = () => { size += 2; remember(); };
-  for (const control of [...controls, wrap]) control.onchange = remember;
+  for (const control of [...controls, ...choices, wrap]) control.onchange = remember;
   el("focus").onclick = () => setFocusMode(!document.body.classList.contains("focused"));
   apply();
 }

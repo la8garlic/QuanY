@@ -5,6 +5,31 @@ const sections = [
   ["files", "文件与保存", Folder],
   ["writing", "写作外观", Paintbrush],
 ] as const;
+type ChoiceProps = {
+  name: "theme" | "leading" | "width";
+  label: string;
+  initial: string;
+  options: [string, string][];
+};
+
+function WritingChoice({ name, label, initial, options }: ChoiceProps) {
+  return (
+    <fieldset className={name === "theme" ? "paper-field" : "choice-field"}>
+      <legend>{label}</legend>
+      <div className={name === "theme" ? "paper-choices" : "segments"}>
+        {options.map(([value, text]) => (
+          <label key={value}>
+            <input type="radio" name={name} value={value} defaultChecked={initial === value} />
+            {name === "theme" && <span className="paper-sample" data-paper={value} aria-hidden="true"><i /></span>}
+            <span>{text}</span>
+            {name === "theme" && <Check className="choice-check" aria-hidden="true" />}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function Settings() {
   const [page, setPage] = useState<string>("system");
   return (
@@ -12,13 +37,12 @@ function Settings() {
       <header>
         <h2 id="settings-title">设置</h2>
         <form method="dialog">
-          <button className="control-primary" aria-label="关闭设置">
-            <Check aria-hidden="true" />
-            完成
+          <button className="control-close" aria-label="关闭设置" title="关闭设置">
+            <X aria-hidden="true" />
           </button>
         </form>
       </header>
-      <div className="settings-tabs" aria-label="设置分类">
+      <div className="settings-tabs" role="group" aria-label="设置分类">
         {sections.map(([key, label, Icon]) => (
           <button key={key} data-page={key} aria-pressed={page === key} onClick={() => setPage(key)}>
             <Icon aria-hidden="true" />
@@ -76,7 +100,7 @@ function Settings() {
         </label>
       </section>
       <section data-settings="writing" hidden={page !== "writing"}>
-        <h3>写作外观</h3>
+        <WritingChoice name="theme" label="纸张" initial="paper" options={[["paper", "米白"], ["night", "夜色"]]} />
         <div className="settings-grid">
           <label className="setting">
             字体
@@ -98,29 +122,9 @@ function Settings() {
               </button>
             </div>
           </div>
-          <label className="setting">
-            行距
-            <select id="leading" defaultValue="1.75">
-              <option value="1.5">紧凑</option>
-              <option value="1.75">标准</option>
-              <option value="1.95">宽松</option>
-            </select>
-          </label>
-          <label className="setting">
-            纸张
-            <select id="theme">
-              <option value="paper">米白</option>
-              <option value="night">夜色</option>
-            </select>
-          </label>
-          <label className="setting">
-            正文宽度
-            <select id="width">
-              <option value="reading">阅读宽度</option>
-              <option value="full">铺满窗口</option>
-            </select>
-          </label>
-          <label className="setting">
+          <WritingChoice name="leading" label="行距" initial="1.75" options={[["1.5", "紧凑"], ["1.75", "标准"], ["1.95", "宽松"]]} />
+          <WritingChoice name="width" label="正文宽度" initial="reading" options={[["reading", "阅读宽度"], ["full", "铺满窗口"]]} />
+          <label className="setting wrap-row">
             自动换行
             <input id="wrap" type="checkbox" role="switch" />
           </label>

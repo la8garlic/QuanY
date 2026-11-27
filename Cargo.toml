@@ -1,6 +1,6 @@
 [package]
 name = "quany"
-version = "1.6.2"
+version = "1.6.3"
 edition = "2021"
 description = "泉涌（QuanY）· 本地写作记事本"
 build = "build.rs"

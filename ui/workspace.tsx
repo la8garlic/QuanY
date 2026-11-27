@@ -8,7 +8,7 @@ import {
   FolderOpen,
   History,
   Maximize,
-  PanelTop,
+  PictureInPicture2,
   Save,
   FileOutput,
   Search,
@@ -93,7 +93,7 @@ function WritingDesk({
           <span id="focus-label">专注</span>
         </button>
         <button id="quick-toggle">
-          <PanelTop aria-hidden="true" />
+          <PictureInPicture2 aria-hidden="true" />
           <span id="quick-label">速记窗</span>
         </button>
         <button id="stow">收起</button>
