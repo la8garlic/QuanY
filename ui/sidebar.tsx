@@ -76,7 +76,7 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
   return (
     <aside aria-label="稿本">
       <header className="brand" data-tauri-drag-region>
-        <img className="brand-stamp" alt="" draggable={false} src={new URL("../assets/quany.png", import.meta.url).href} />
+        <img className="brand-stamp" alt="" draggable={false} src={new URL("../assets/quany-mark.png", import.meta.url).href} />
         <strong data-tauri-drag-region>泉涌</strong>
         <button id="new" aria-label="新建手稿" title="新建手稿">
           <Plus aria-hidden="true" />
