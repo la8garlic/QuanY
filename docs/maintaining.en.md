@@ -24,11 +24,11 @@ Dependabot alerts, secret scanning, push protection and private vulnerability re
 ```powershell
 gh run view RUN_ID --repo la8garlic/QuanY --json headSha,headBranch,event,conclusion,url
 gh run download RUN_ID --repo la8garlic/QuanY --name QuanY-windows-x64 --dir release-download
-Get-FileHash .\release-download\QuanY-VERSION-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\release-download\QuanY.exe -Algorithm SHA256
 ```
 
-3. Compare the checksum, inspect the executable version, architecture and notices, then smoke-check startup and saving with a disposable library. A maintainer creates and pushes an annotated `vVERSION` tag at the verified SHA.
-4. Create a draft using `gh release create vVERSION --verify-tag --draft`. Attach the ZIP and `SHA256SUMS.txt`, bilingual release notes and the build run URL before publishing. Immutable releases are enabled. Ship binary or attachment corrections in a new version.
+3. Compare the checksum, inspect the executable version, architecture and embedded notices, then smoke-check startup and saving with a disposable library. A maintainer creates and pushes an annotated `vVERSION` tag at the verified SHA.
+4. Create a draft using `gh release create vVERSION --verify-tag --draft`. Attach QuanY.exe and `SHA256SUMS.txt`, bilingual release notes and the build run URL before publishing. Immutable releases are enabled. Ship binary or attachment corrections in a new version.
 5. Download both public assets again, compare their hashes and inspect the tag, assets and publication state using `gh release view vVERSION`. GitHub provides automatic source archives for the tag.
 
 [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) · [Actions security](https://docs.github.com/en/actions/reference/security/secure-use) · [Managing releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)

@@ -1,5 +1,7 @@
+import { locale, setLanguage, t, type Language } from "./i18n";
 import { Check, Folder, Keyboard, Minus, Paintbrush, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { standby } from "./ipc";
+import { useRef, useState } from "react";
 const sections = [
   ["system", "待命与快捷键", Keyboard],
   ["files", "文件与保存", Folder],
@@ -31,106 +33,137 @@ function WritingChoice({ name, label, initial, options }: ChoiceProps) {
 }
 
 function Settings() {
+  const licenses = useRef<HTMLDialogElement>(null);
+  const [notices, setNotices] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const [languageError, setLanguageError] = useState("");
   const [page, setPage] = useState<string>("system");
   return (
-    <dialog id="panel" aria-labelledby="settings-title">
+    <><dialog id="panel" aria-labelledby="settings-title">
       <header>
-        <h2 id="settings-title">设置</h2>
+        <h2 id="settings-title">{t("设置")}</h2>
         <form method="dialog">
-          <button className="control-close" aria-label="关闭设置" title="关闭设置">
+          <button className="control-close" aria-label={t("关闭设置")} title={t("关闭设置")}>
             <X aria-hidden="true" />
           </button>
         </form>
       </header>
-      <div className="settings-tabs" role="group" aria-label="设置分类">
+      <div className="settings-tabs" role="group" aria-label={t("设置分类")}>
         {sections.map(([key, label, Icon]) => (
           <button key={key} data-page={key} aria-pressed={page === key} onClick={() => setPage(key)}>
             <Icon aria-hidden="true" />
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
       <section data-settings="system" hidden={page !== "system"}>
-        <h3>随时待命</h3>
         <label className="setting">
-          关闭窗口后保留在托盘
+          {t("界面语言")}
+          <select id="language" value={locale} disabled={switching} onChange={async event => {
+            const next = event.target.value as Language;
+            setSwitching(true);
+            try {
+              await standby.setLanguage(next === "en");
+              setLanguage(next);
+              setLanguageError("");
+            } catch (error) { setLanguageError(String(error)); }
+            finally { setSwitching(false); }
+          }}>
+            <option value="zh-CN" lang="zh-CN">简体中文</option>
+            <option value="en" lang="en">English</option>
+          </select>
+        </label>
+        {languageError && <p role="alert">{languageError}</p>}
+        <h3>{t("随时待命")}</h3>
+        <label className="setting">
+          {t("关闭窗口后保留在托盘")}
           <input id="resident" type="checkbox" role="switch" />
         </label>
         <label className="setting">
-          登录 Windows 后在托盘启动
+          {t("登录 Windows 后在托盘启动")}
           <input id="autostart" type="checkbox" role="switch" />
         </label>
         <div className="setting">
-          <span>全局打开主窗口</span>
+          <span>{t("全局打开主窗口")}</span>
           <button id="main-key" className="keycap"></button>
         </div>
         <div className="setting">
-          <span>全局唤出速记窗</span>
+          <span>{t("全局唤出速记窗")}</span>
           <button id="summon-key" className="keycap"></button>
         </div>
-        <p id="standby-info" role="status">
-          点击键位后按新组合键，Esc 取消。托盘右键可保存并退出。
-        </p>
+        <p id="standby-info" role="status"></p>
         <details id="key-list">
-          <summary>编辑器快捷键</summary>
+          <summary>{t("编辑器快捷键")}</summary>
           <div id="bindings"></div>
-          <button id="reset-keys">恢复编辑器默认键位</button>
+          <button id="reset-keys">{t("恢复编辑器默认键位")}</button>
         </details>
+        <button id="show-licenses" onClick={async () => {
+          if (!notices) {
+            const response = await fetch("./licenses.txt");
+            if (!response.ok) throw new Error("licenses.txt: " + response.status);
+            setNotices(await response.text());
+          }
+          licenses.current!.showModal();
+        }}>{t("许可证与第三方声明")}</button>
       </section>
       <section data-settings="files" hidden={page !== "files"}>
-        <h3>文件与保存</h3>
-        <label htmlFor="folder">新稿默认保存目录</label>
+        <h3>{t("文件与保存")}</h3>
+        <label htmlFor="folder">{t("新稿默认保存目录")}</label>
         <div className="folder-row">
           <input id="folder" spellCheck={false} />
-          <button id="browse">浏览…</button>
+          <button id="browse">{t("浏览…")}</button>
           <button className="control-primary" id="apply-folder">
-            应用
+            {t("应用")}
           </button>
         </div>
-        <p id="folder-info" role="status">
-          新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。
-        </p>
+        <p id="folder-info" role="status"></p>
         <label className="setting">
-          停笔后自动保存
+          {t("停笔后自动保存")}
           <select id="delay">
-            <option value="650">0.65 秒</option>
-            <option value="2000">2 秒</option>
-            <option value="5000">5 秒</option>
+            <option value="650">{t("0.65 秒")}</option>
+            <option value="2000">{t("2 秒")}</option>
+            <option value="5000">{t("5 秒")}</option>
           </select>
         </label>
       </section>
       <section data-settings="writing" hidden={page !== "writing"}>
-        <WritingChoice name="theme" label="纸张" initial="paper" options={[["paper", "米白"], ["night", "夜色"]]} />
+        <WritingChoice name="theme" label={t("纸张")} initial="paper" options={[["paper", t("米白")], ["night", t("夜色")]]} />
         <div className="settings-grid">
           <label className="setting">
-            字体
+            {t("字体")}
             <select id="font">
-              <option value="serif">宋体</option>
-              <option value="sans">微软雅黑</option>
-              <option value="mono">等宽</option>
+              <option value="serif">{t("宋体")}</option>
+              <option value="sans">{t("微软雅黑")}</option>
+              <option value="mono">{t("等宽")}</option>
             </select>
           </label>
           <div className="setting">
-            <span>字号</span>
-            <div className="stepper" role="group" aria-label="字号">
-              <button id="smaller" aria-label="减小字号">
+            <span>{t("字号")}</span>
+            <div className="stepper" role="group" aria-label={t("字号")}>
+              <button id="smaller" aria-label={t("减小字号")}>
                 <Minus aria-hidden="true" />
               </button>
               <output id="size"></output>
-              <button id="larger" aria-label="增大字号">
+              <button id="larger" aria-label={t("增大字号")}>
                 <Plus aria-hidden="true" />
               </button>
             </div>
           </div>
-          <WritingChoice name="leading" label="行距" initial="1.75" options={[["1.5", "紧凑"], ["1.75", "标准"], ["1.95", "宽松"]]} />
-          <WritingChoice name="width" label="正文宽度" initial="reading" options={[["reading", "阅读宽度"], ["full", "铺满窗口"]]} />
+          <WritingChoice name="leading" label={t("行距")} initial="1.75" options={[["1.5", t("紧凑")], ["1.75", t("标准")], ["1.95", t("宽松")]]} />
+          <WritingChoice name="width" label={t("正文宽度")} initial="reading" options={[["reading", t("阅读宽度")], ["full", t("铺满窗口")]]} />
           <label className="setting wrap-row">
-            自动换行
+            {t("自动换行")}
             <input id="wrap" type="checkbox" role="switch" />
           </label>
         </div>
       </section>
     </dialog>
+    <dialog ref={licenses} id="licenses" aria-labelledby="licenses-title">
+      <header><h2 id="licenses-title">{t("许可证与第三方声明")}</h2>
+        <form method="dialog"><button className="control-close" aria-label={t("关闭")}><X /></button></form>
+      </header>
+      <textarea readOnly aria-labelledby="licenses-title" value={notices} />
+    </dialog></>
   );
 }
 export function Dialogs() {
@@ -138,44 +171,44 @@ export function Dialogs() {
     <>
       <dialog id="history" className="work-dialog">
         <header>
-          <h2>版本历史</h2>
-          <button className="control-close" id="history-close" aria-label="关闭历史">
+          <h2>{t("版本历史")}</h2>
+          <button className="control-close" id="history-close" aria-label={t("关闭历史")}>
             <X aria-hidden="true" />
           </button>
         </header>
         <div className="history-tools">
-          <select id="version-list" aria-label="选择历史版本"></select>
-          <button id="checkpoint">保存当前版本</button>
+          <select id="version-list" aria-label={t("选择历史版本")}></select>
+          <button id="checkpoint">{t("保存当前版本")}</button>
         </div>
         <p id="version-state" role="status"></p>
-        <div id="changes" aria-label="历史版与当前稿的逐行差异"></div>
+        <div id="changes" aria-label={t("历史版与当前稿的逐行差异")}></div>
         <form method="dialog">
           <button id="restore" type="button">
-            恢复此版
+            {t("恢复此版")}
           </button>
         </form>
       </dialog>
       <dialog id="memo-list" className="work-dialog">
         <header>
-          <h2>独立便笺</h2>
+          <h2>{t("独立便笺")}</h2>
           <form method="dialog">
-            <button className="control-close" aria-label="关闭便笺列表">
+            <button className="control-close" aria-label={t("关闭便笺列表")}>
               <X aria-hidden="true" />
             </button>
           </form>
         </header>
         <div id="memo-items"></div>
-        <button id="create-memo">＋ 新建置顶便笺</button>
+        <button id="create-memo">{t("＋ 新建置顶便笺")}</button>
       </dialog>
       <dialog id="confirm">
-        <h2>从稿本移除这篇手稿？</h2>
+        <h2>{t("从稿本移除这篇手稿？")}</h2>
         <p id="confirm-text"></p>
         <form method="dialog">
           <button value="cancel" autoFocus>
-            取消
+            {t("取消")}
           </button>
           <button value="delete" className="danger">
-            移除手稿
+            {t("移除手稿")}
           </button>
         </form>
       </dialog>

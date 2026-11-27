@@ -1,3 +1,4 @@
+import { locale, onLanguageChange, t } from "./i18n";
 import { initResearch } from "./research.js";
 import { initKeys, localAction } from "./shortcuts.js";
 import { desktop, standby, library, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
@@ -20,7 +21,8 @@ const confirm = el<HTMLDialogElement>("confirm");
 function errorMessage(error: unknown, retry?: () => void) {
   el("error-text").textContent = String(error);
   el("error").hidden = false;
-  el("retry").textContent = retry ? "重试" : "知道了";
+  el("retry").dataset.retry = String(!!retry);
+  el("retry").textContent = t(retry ? "重试" : "知道了");
   el("retry").onclick = () => { el("error").hidden = true; retry?.(); };
 }
 
@@ -60,12 +62,12 @@ function stopTimers() {
 }
 
 function setModified(value:number) {
-  el("modified").textContent=new Date(value).toLocaleDateString("zh-CN",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
+  el("modified").textContent=new Date(value).toLocaleDateString(locale,{year:"numeric",month:"long",day:"numeric",weekday:"long"});
 }
 function displayPath() {
   const label = el("filepath");
   label.textContent = path ?? folder;
-  label.title = (path ?? folder) + "（点击打开所在目录）";
+  label.title = (path ?? folder) + t("（点击打开所在目录）");
 }
 
 function saved(result: Saved) {
@@ -235,7 +237,7 @@ el("save-as").onclick = () => action(async () => {
 el("remove").onclick = () => {
   if (!ready || busy) return;
 
-  el("confirm-text").textContent = "“" + (title.value.trim() || body.value.slice(0, 32).trim() || untitled) + "” 将从稿本移除。已保存的 TXT 文件会保留。";
+  el("confirm-text").textContent = t("“{title}” 将从稿本移除。已保存的 TXT 文件会保留。").replace("{title}", () => title.value.trim() || body.value.slice(0, 32).trim() || untitled());
   confirm.returnValue = "cancel";
   confirm.showModal();
 };
@@ -249,7 +251,7 @@ confirm.onclose = () => {
 function isQuick() { return document.body.classList.contains("quick"); }
 function quickLayout(on:boolean) {
   document.body.classList.toggle("quick",on);
-  el("quick-label").textContent=on?"展开主窗口":"速记窗";
+  el("quick-label").textContent=t(on ? "展开主窗口" : "速记窗");
 }
 type Intent="quick"|"full"|"quit"|"hide";
 function dispatch(intent:Intent) {
@@ -292,6 +294,7 @@ document.addEventListener("keydown", e => {
 
 async function boot() {
   try {
+    await standby.setLanguage(locale === "en");
     show(await library.start());
     const prefs=await standby.read();
     initKeys(prefs.bindings,prefs.autostart);
@@ -321,5 +324,13 @@ settings(value => { folder = value; displayPath(); });
 initFind();
 export function startEditor(onLibraryChange: Publish) {
   publish = onLibraryChange;
+  onLanguageChange(() => {
+    if (!ready) return;
+    quickLayout(isQuick());
+    displayPath();
+    setModified(entries.find(entry => entry.id === current)!.modified);
+    el("retry").textContent = t(el("retry").dataset.retry === "true" ? "重试" : "知道了");
+    updateReference();
+  });
   void boot();
 }

@@ -1,4 +1,5 @@
 //! 每张便笺独占一个窗口和一条记录。退出应用时，等待便笺完成保存并真正关闭。
+use crate::language::tr;
 use crate::{commands::query, storage::Library};
 use serde::Serialize;
 use std::{
@@ -60,7 +61,7 @@ pub async fn open_memo(
             .map_err(|e| e.to_string());
     }
     let w = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("memo.html".into()))
-        .title("泉涌 · 独立便笺")
+        .title(tr("泉涌 · 独立便笺", "QuanY · Sticky note"))
         .decorations(false)
         .inner_size(320., 240.)
         .min_inner_size(240., 165.)
@@ -89,9 +90,12 @@ pub async fn open_memo(
 fn memo_id(w: &WebviewWindow) -> Result<i64, String> {
     w.label()
         .strip_prefix("memo-")
-        .ok_or("仅可从便笺窗口访问")?
+        .ok_or(tr(
+            "仅可从便笺窗口访问",
+            "Only accessible from a sticky note",
+        ))?
         .parse()
-        .map_err(|_| "无效的便笺编号".into())
+        .map_err(|_| tr("无效的便笺编号", "Invalid sticky note ID").into())
 }
 #[tauri::command]
 pub async fn memo_read(window: WebviewWindow, state: State<'_, Library>) -> Result<String, String> {
@@ -142,7 +146,11 @@ pub async fn exit_editor(app: AppHandle) -> Result<(), String> {
             .wait_timeout_while(labels, Duration::from_secs(10), |s| !s.is_empty())
             .expect("便笺关闭锁损坏");
         if !remaining.is_empty() {
-            return Err("便笺尚未保存关闭，请检查便笺窗口后再退出。".into());
+            return Err(tr(
+                "便笺尚未保存关闭，请检查便笺窗口后再退出。",
+                "A sticky note is still open. Check its save status before quitting.",
+            )
+            .into());
         }
         Ok(())
     })

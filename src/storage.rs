@@ -1,5 +1,6 @@
 //! SQLite 只接收完整稿件快照，正文、标题和修改时间在同一次提交中落盘。
 
+use crate::language::tr;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,7 +71,10 @@ impl Library {
         match writer.try_lock() {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
-                return Err("这个稿本已经在另一个泉涌窗口中打开。".into())
+                return Err(
+                    "This library is already open in QuanY. / 这个稿本已经在另一个泉涌窗口中打开。"
+                        .into(),
+                )
             }
             Err(std::fs::TryLockError::Error(err)) => return Err(err.into()),
         }
@@ -171,7 +175,11 @@ pub fn set_details(db: &mut Connection, id: i64, details: Details) -> crate::fil
             continue;
         }
         if tag.contains(['\r', '\n', ',', '，']) {
-            return Err("标签名称中不能包含逗号或换行。".into());
+            return Err(tr(
+                "标签名称中不能包含逗号或换行。",
+                "Tags cannot contain commas or newlines.",
+            )
+            .into());
         }
         if !tags.contains(&tag) {
             tags.push(tag);

@@ -1,4 +1,5 @@
 //! 托盘和系统热键只发出意图；窗口隐藏和退出须经编辑器已有的保存流程。
+use crate::language::tr;
 use crate::storage::Library;
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, io, sync::Mutex};
@@ -152,7 +153,15 @@ pub fn set_autostart(enabled: bool) -> std::result::Result<bool, String> {
         }
         startup_enabled()
     })()
-    .map_err(|e| format!("无法更新登录启动项：{e}"))
+    .map_err(|e| {
+        format!(
+            "{} {e}",
+            tr(
+                "无法更新登录启动项：",
+                "Could not update startup at sign-in:"
+            )
+        )
+    })
 }
 
 #[derive(Serialize)]
@@ -182,9 +191,15 @@ pub async fn bind_summon(
     key: String,
     target: Target,
 ) -> std::result::Result<Binding, String> {
-    let next: Shortcut = key.parse().map_err(|e| format!("快捷键格式无效：{e}"))?;
+    let next: Shortcut = key
+        .parse()
+        .map_err(|e| format!("{} {e}", tr("快捷键格式无效：", "Invalid shortcut:")))?;
     if next.mods.is_empty() {
-        return Err("全局快捷键需要修饰键。".into());
+        return Err(tr(
+            "全局快捷键需要修饰键。",
+            "A global shortcut needs a modifier key.",
+        )
+        .into());
     }
     let mut bindings = state.bindings.lock().expect("快捷键锁损坏");
     let (old, other, sql) = match target {
@@ -200,18 +215,33 @@ pub async fn bind_summon(
         ),
     };
     if other.key.parse::<Shortcut>().is_ok_and(|k| k == next) {
-        return Err("主窗口与速记窗不能使用相同的快捷键。".into());
+        return Err(tr(
+            "主窗口与速记窗不能使用相同的快捷键。",
+            "Use different shortcuts for the main window and quick capture.",
+        )
+        .into());
     }
     if old.key == key && old.issue.is_none() {
         return Ok(old.clone());
     }
     let manager = app.global_shortcut();
-    register(&app, target, next).map_err(|e| format!("无法注册 {key}，请换一组按键：{e}"))?;
+    register(&app, target, next).map_err(|e| {
+        format!(
+            "{key}: {} {e}",
+            tr(
+                "无法注册，请换一组按键：",
+                "Could not register this shortcut. Choose another:"
+            )
+        )
+    })?;
     let db = library.db.lock().expect("稿本锁损坏");
     if let Err(e) = db.execute(sql, [&key]) {
-        manager
-            .unregister(next)
-            .map_err(|rollback| format!("{e}；撤回新快捷键失败：{rollback}"))?;
+        manager.unregister(next).map_err(|rollback| {
+            format!(
+                "{e}; {} {rollback}",
+                tr("撤回新快捷键失败：", "Could not roll back shortcut:")
+            )
+        })?;
         return Err(e.to_string());
     }
     if old.issue.is_none() {
@@ -236,11 +266,48 @@ pub fn signal(app: &AppHandle, action: &str) {
             .and_then(|()| w.emit("standby-action", action));
         if let Err(e) = result {
             rfd::MessageDialog::new()
-                .set_title("泉涌")
+                .set_title(tr("泉涌", "QuanY"))
                 .set_description(e.to_string())
                 .show();
         }
     }
+}
+
+struct TrayItems {
+    quick: MenuItem<tauri::Wry>,
+    full: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
+}
+
+#[tauri::command]
+pub async fn set_language(app: AppHandle, english: bool) -> std::result::Result<(), String> {
+    crate::language::set(english);
+    let items = app.state::<TrayItems>();
+    (|| -> tauri::Result<()> {
+        items.quick.set_text(tr("右下角速记", "Quick capture"))?;
+        items.full.set_text(tr("打开主窗口", "Open main window"))?;
+        items.quit.set_text(tr("保存并退出", "Save and quit"))?;
+        app.tray_by_id("quany")
+            .expect("tray installed")
+            .set_tooltip(Some(tr(
+                "泉涌 · 单击速记，右击菜单",
+                "QuanY · Click to capture, right-click for menu",
+            )))?;
+        let compact = app.state::<Standby>();
+        let full = compact.full.lock().expect("window state poisoned");
+        for (label, window) in app.webview_windows() {
+            let title = if label.starts_with("memo-") {
+                tr("泉涌 · 独立便笺", "QuanY · Sticky note")
+            } else if full.is_some() {
+                tr("泉涌 · 速记", "QuanY · Quick capture")
+            } else {
+                tr("泉涌", "QuanY")
+            };
+            window.set_title(title)?;
+        }
+        Ok(())
+    })()
+    .map_err(|e| e.to_string())
 }
 
 pub fn install(app: &tauri::App) -> Result<()> {
@@ -260,7 +327,7 @@ pub fn install(app: &tauri::App) -> Result<()> {
     let install_key = |key: String, target| -> Result<Binding> {
         let issue = register(app.handle(), target, key.parse()?)
             .err()
-            .map(|e| format!("全局快捷键 {key} 注册失败，请在设置中更换：{e}"));
+            .map(|e| format!("{key}: {e}"));
         Ok(Binding { key, issue })
     };
     app.manage(Standby {
@@ -274,6 +341,7 @@ pub fn install(app: &tauri::App) -> Result<()> {
     let full = MenuItem::with_id(app, "full", "打开主窗口", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "保存并退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quick, &full, &quit])?;
+    app.manage(TrayItems { quick, full, quit });
     TrayIconBuilder::with_id("quany")
         .icon(app.default_window_icon().ok_or("缺少泉涌图标")?.clone())
         .tooltip("泉涌 · 单击速记，右击菜单")
@@ -311,7 +379,10 @@ pub async fn display_editor(
             let monitor = window
                 .monitor_from_point(cursor.x, cursor.y)?
                 .or(window.current_monitor()?)
-                .ok_or("无法取得显示器工作区")?;
+                .ok_or(tr(
+                    "无法取得显示器工作区",
+                    "Could not read the monitor work area",
+                ))?;
             if full.is_none() {
                 let maximized = window.is_maximized()?;
                 if maximized {
@@ -338,7 +409,7 @@ pub async fn display_editor(
                 area.position.y + (area.size.height as i32 - outer.height as i32 - pad).max(0),
             ))?;
             window.set_always_on_top(true)?;
-            window.set_title("泉涌 · 速记")?;
+            window.set_title(tr("泉涌 · 速记", "QuanY · Quick capture"))?;
         } else if let Some(g) = full.as_ref() {
             if window.is_maximized()? {
                 window.unmaximize()?;
@@ -350,7 +421,7 @@ pub async fn display_editor(
             if g.maximized {
                 window.maximize()?;
             }
-            window.set_title("泉涌")?;
+            window.set_title(tr("泉涌", "QuanY"))?;
             *full = None;
         }
         window.show()?;

@@ -1,3 +1,4 @@
+import { locale, onLanguageChange } from "./i18n";
 /** 直接查找纯文本偏移量，替换通过编辑控件完成，可使用 Ctrl+Z 撤销。 */
 import { body, el } from "./view.js";
 
@@ -12,7 +13,7 @@ function recount() {
     let pos = text.indexOf(query);
     while (pos >= 0) { hits.push(pos); pos = text.indexOf(query, pos + query.length); }
   }
-  el("matches").textContent = query ? hits.length + " 处" : "";
+  el("matches").textContent = query ? hits.length + (locale === "zh-CN" ? " 处" : hits.length === 1 ? " match" : " matches") : "";
   for (const id of ["prev","next","replace-one","replace-all"]) el<HTMLButtonElement>(id).disabled = !hits.length;
 }
 
@@ -57,6 +58,7 @@ export function initFind() {
   el("prev").onclick = () => move(true);
   el("replace-one").onclick = () => replace(false);
   el("replace-all").onclick = () => replace(true);
+  onLanguageChange(() => { if (!bar.hidden) recount(); });
   needle.oninput = recount;
   body.addEventListener("input", () => { if (!bar.hidden) recount(); });
   document.addEventListener("keydown", e => {

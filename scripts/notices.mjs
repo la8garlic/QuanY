@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 // Cargo 的目标平台过滤覆盖运行时依赖和构建工具，输出只含上游版本、网址及声明。
@@ -33,4 +33,4 @@ for (const name of ["react", "react-dom", "scheduler", "lucide-react", "vite"]) 
 }
 sections.push("Microsoft WebView2 SDK loader\nhttps://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.3800.47",
   ...["Microsoft-WebView2-SDK.txt", "Microsoft-WebView2-NOTICE.txt"].map(file => readFileSync(join("scripts/license-texts", file), "utf8")));
-writeFileSync(process.argv[2], sections.join("\n\n") + "\n");
+process.stdout.write([readFileSync("LICENSE", "utf8"), readFileSync("NOTICE", "utf8"), ...sections].join("\n\n") + "\n");

@@ -1,28 +1,31 @@
+import { locale, onLanguageChange, t, type Message } from "./i18n";
 import { characterCount } from "./statistics";
 /** 固定模板中的控件在编译时约定类型，动态稿件标题始终作为文本显示。 */
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export const title = el<HTMLInputElement>("title");
 export const body = el<HTMLTextAreaElement>("body");
-export const untitled = "未命名手稿";
+export const untitled = () => t("未命名手稿");
 import { library } from "./ipc.js";
 let goal = 0;
 export function setGoal(target:number) { goal = target; }
 export function count(text: string) {
   const n = characterCount(text);
-  el("count").textContent = n.toLocaleString("zh-CN") + (goal ? " / " + goal.toLocaleString("zh-CN") : "") + " 字";
+  el("count").textContent = n.toLocaleString(locale) + (goal ? " / " + goal.toLocaleString(locale) : "") + (locale === "zh-CN" ? " 字" : (goal || n) === 1 ? " character" : " characters");
   const bar = el<HTMLProgressElement>("goal-progress");
   bar.hidden = !goal;
   if (goal) { bar.max=goal; bar.value=n; }
 }
-export function status(text: string, state = "saved") {
-  el("save").textContent = text;
+let saveMessage: Message = "正在打开稿本";
+export function status(text: Message, state = "saved") {
+  saveMessage = text;
+  el("save").textContent = t(text);
   el("save").dataset.state = state;
 }
 
 export function setFocusMode(on: boolean) {
   document.body.classList.toggle("focused", on);
   el("focus").setAttribute("aria-pressed", String(on));
-  el("focus-label").textContent = on ? "退出专注" : "专注";
+  el("focus-label").textContent = t(on ? "退出专注" : "专注");
   body.focus();
 }
 
@@ -37,10 +40,18 @@ export function settings(onDirectory: (value: string) => void) {
   const root = document.documentElement;
   const panel = el<HTMLDialogElement>("panel");
   const input = el<HTMLInputElement>("folder"), hint = el("folder-info");
-  const note = hint.textContent;
+  const note = () => t("新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。");
+  const refresh = () => {
+    hint.textContent = note();
+    el("save").textContent = t(saveMessage);
+    el("focus-label").textContent = t(document.body.classList.contains("focused") ? "退出专注" : "专注");
+    count(body.value);
+  };
+  refresh();
+  onLanguageChange(refresh);
   el("options").onclick = () => {
     input.value = directory;
-    hint.textContent = note;
+    hint.textContent = note();
     panel.showModal();
   };
   async function updateFolder(pick: boolean) {
@@ -48,7 +59,7 @@ export function settings(onDirectory: (value: string) => void) {
     buttons.forEach(b => b.disabled = true);
     try {
       const value = await (pick ? library.chooseFolder() : library.setFolder(input.value.trim()));
-      if (value !== null) { setDirectory(value); onDirectory(value); hint.textContent = "目录已保存，新稿将在此创建 TXT。"; }
+      if (value !== null) { setDirectory(value); onDirectory(value); hint.textContent = t("目录已保存，新稿将在此创建 TXT。"); }
     } catch (error) { hint.textContent = String(error); }
     finally { buttons.forEach(b => b.disabled = false); }
   }

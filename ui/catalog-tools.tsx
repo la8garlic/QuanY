@@ -1,3 +1,4 @@
+import { locale, t, type Message } from "./i18n";
 import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Entry } from "./ipc";
@@ -13,7 +14,7 @@ export function DetailsDialog({
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [names, setNames] = useState(entry.tags.join("，"));
+  const [names, setNames] = useState(entry.tags.join(locale === "en" ? ", " : "，"));
   const [pinned, setPinned] = useState(entry.pinned);
   const [target, setTarget] = useState(entry.goal ? String(entry.goal) : "");
   const [saving, setSaving] = useState(false);
@@ -39,17 +40,17 @@ export function DetailsDialog({
       aria-labelledby="details-heading"
     >
       <header>
-        <h2 id="details-heading">手稿详情</h2>
-        <button className="control-close" aria-label="关闭详情" onClick={() => ref.current!.close()}>
+        <h2 id="details-heading">{t("手稿详情")}</h2>
+        <button className="control-close" aria-label={t("关闭详情")} onClick={() => ref.current!.close()}>
           <X aria-hidden="true" />
         </button>
       </header>
-      <p className="entry-name">{entry.title || "未命名手稿"}</p>
+      <p className="entry-name">{entry.title || t("未命名手稿")}</p>
       <dl className="stats-grid">
         {Object.entries(stats).map(([name, value]) => (
           <div key={name}>
-            <dt>{name}</dt>
-            <dd>{value.toLocaleString()}</dd>
+            <dt>{t(name as Message)}</dt>
+            <dd>{value.toLocaleString(locale)}</dd>
           </div>
         ))}
       </dl>
@@ -62,14 +63,14 @@ export function DetailsDialog({
             const { editDetails } = await import("./editor");
             if (await editDetails(entry.id, { pinned, tags: parsed, goal: Number(target) }))
               ref.current?.close();
-            else setError("尚未应用，请检查主窗保存状态。");
+            else setError(t("尚未应用，请检查主窗保存状态。"));
           } finally {
             setSaving(false);
           }
         }}
       >
         <label className="setting">
-          置顶到稿本顶部
+          {t("置顶到稿本顶部")}
           <input
             id="detail-pin"
             type="checkbox"
@@ -78,12 +79,12 @@ export function DetailsDialog({
             onChange={(e) => setPinned(e.target.checked)}
           />
         </label>
-        <label htmlFor="detail-tags">标签</label>
+        <label htmlFor="detail-tags">{t("标签")}</label>
         <input
           id="detail-tags"
           value={names}
           onChange={(e) => setNames(e.target.value)}
-          placeholder="多个标签用逗号分隔"
+          placeholder={t("多个标签用逗号分隔")}
         />
         {tags.some((t) => !parsed.includes(t)) && (
           <div className="tag-suggestions">
@@ -91,13 +92,13 @@ export function DetailsDialog({
               .filter((t) => !parsed.includes(t))
               .slice(0, 8)
               .map((tag) => (
-                <button type="button" key={tag} onClick={() => setNames([...parsed, tag].join("，"))}>
+                <button type="button" key={tag} onClick={() => setNames([...parsed, tag].join(locale === "en" ? ", " : "，"))}>
                   ＋ {tag}
                 </button>
               ))}
           </div>
         )}
-        <label htmlFor="detail-goal">本篇字数目标</label>
+        <label htmlFor="detail-goal">{t("本篇字数目标")}</label>
         <input
           id="detail-goal"
           type="number"
@@ -105,16 +106,16 @@ export function DetailsDialog({
           max="4294967295"
           step="1"
           value={target}
-          placeholder="留空关闭目标"
+          placeholder={t("留空关闭目标")}
           onChange={(e) => setTarget(e.target.value)}
         />
         {error && <p role="alert">{error}</p>}
         <div className="dialog-actions">
           <button type="button" onClick={() => ref.current!.close()}>
-            取消
+            {t("取消")}
           </button>
           <button className="apply" id="apply-details" disabled={saving}>
-            保存设置
+            {t("保存设置")}
           </button>
         </div>
       </form>
@@ -129,7 +130,7 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
   const term = query.trim(),
     normalized = term.toLocaleLowerCase();
   const matches = entries
-    .filter((n) => (n.title || "未命名手稿").toLocaleLowerCase().includes(normalized))
+    .filter((n) => (n.title || t("未命名手稿")).toLocaleLowerCase().includes(normalized))
     .slice(0, 15);
   const create = term !== "" && !entries.some((n) => n.title === term);
   const length = matches.length + Number(create);
@@ -157,19 +158,19 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
           document.querySelector<HTMLTextAreaElement>("#body")!.focus();
         close();
       }}
-      aria-label="快速切稿"
+      aria-label={t("快速切稿")}
     >
       <header>
-        <h2>快速切稿</h2>
-        <button className="control-close" aria-label="关闭快速切稿" onClick={() => ref.current!.close()}>
+        <h2>{t("快速切稿")}</h2>
+        <button className="control-close" aria-label={t("关闭快速切稿")} onClick={() => ref.current!.close()}>
           <X aria-hidden="true" />
         </button>
       </header>
       <input
         id="switch-query"
-        aria-label="手稿标题"
+        aria-label={t("手稿标题")}
         autoFocus
-        placeholder="输入标题，打开或新建手稿…"
+        placeholder={t("输入标题，打开或新建手稿…")}
         role="combobox"
         aria-controls="switch-results"
         aria-expanded={true}
@@ -201,7 +202,7 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
             onClick={() => void choose(i)}
           >
             <FileText aria-hidden="true" />
-            {n.title || "未命名手稿"}
+            {n.title || t("未命名手稿")}
           </button>
         ))}
         {create && (
@@ -211,11 +212,11 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
             aria-selected={index === matches.length}
             onClick={() => void choose(matches.length)}
           >
-            ＋ 新建「{term}」
+            ＋ {t("新建「{title}」").replace("{title}", () => term)}
           </button>
         )}
       </div>
-      <p className="switch-hint">↑ ↓ 选择　 Enter 打开　 Esc 关闭</p>
+      <p className="switch-hint">{t("↑ ↓ 选择　 Enter 打开　 Esc 关闭")}</p>
     </dialog>
   );
 }

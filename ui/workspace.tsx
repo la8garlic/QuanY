@@ -1,3 +1,4 @@
+import { locale, t, useLanguage } from "./i18n";
 import { WindowControls } from "./window-controls";
 import {
   ArchiveX,
@@ -35,93 +36,93 @@ function WritingDesk({
       <header className="bar" data-tauri-drag-region>
         <button id="quick-new">
           <FilePenLine aria-hidden="true" />
-          新便笺
+          {t("新便笺")}
         </button>
         <details id="file-menu">
-          <summary title="文件操作">
+          <summary title={t("文件操作")}>
             <FolderOpen aria-hidden="true" />
-            文件
+            {t("文件")}
             <ChevronDown className="chevron" aria-hidden="true" />
           </summary>
           <div>
             <button id="save-file">
               <Save />
-              保存
+              {t("保存")}
               <kbd data-shortcut="save" />
             </button>
             <button id="open-file">
               <FolderOpen />
-              打开 TXT…
+              {t("打开 TXT…")}
               <kbd data-shortcut="open" />
             </button>
             <button id="save-as">
               <FileOutput />
-              另存为…
+              {t("另存为…")}
               <kbd data-shortcut="saveAs" />
             </button>
             <button id="remove">
               <ArchiveX />
-              移出稿本…
+              {t("移出稿本…")}
             </button>
           </div>
         </details>
 
-        <button id="switch-open" className="switch-launch" onClick={openSwitch} title="快速切稿">
+        <button id="switch-open" className="switch-launch" onClick={openSwitch} title={t("快速切稿")}>
           <BookOpen aria-hidden="true" />
-          快速切稿
+          {t("快速切稿")}
         </button>
         <span className="spacer" data-tauri-drag-region />
-        <div className="tool-group" role="group" aria-label="查阅工具">
-          <button className="icon-tool" id="find-open" aria-label="查找">
+        <div className="tool-group" role="group" aria-label={t("查阅工具")}>
+          <button className="icon-tool" id="find-open" aria-label={t("查找")}>
             <Search aria-hidden="true" />
           </button>
-          <button className="icon-tool" id="history-open" title="版本历史" aria-label="版本历史">
+          <button className="icon-tool" id="history-open" title={t("版本历史")} aria-label={t("版本历史")}>
             <History aria-hidden="true" />
           </button>
           <button
             className="icon-tool"
             id="reference-open"
             aria-pressed="false"
-            title="并排参考"
-            aria-label="并排参考"
+            title={t("并排参考")}
+            aria-label={t("并排参考")}
           >
             <Columns2 aria-hidden="true" />
           </button>
         </div>
         <button id="focus" aria-pressed="false">
           <Maximize aria-hidden="true" />
-          <span id="focus-label">专注</span>
+          <span id="focus-label"></span>
         </button>
         <button id="quick-toggle">
           <PictureInPicture2 aria-hidden="true" />
-          <span id="quick-label">速记窗</span>
+          <span id="quick-label"></span>
         </button>
-        <button id="stow">收起</button>
+        <button id="stow">{t("收起")}</button>
         <WindowControls />
       </header>
-      <section id="findbar" aria-label="正文查找与替换" hidden>
+      <section id="findbar" aria-label={t("正文查找与替换")} hidden>
         <div>
-          <input id="needle" aria-label="查找内容" placeholder="查找正文" />
+          <input id="needle" aria-label={t("查找内容")} placeholder={t("查找正文")} />
           <output id="matches" aria-live="polite"></output>
-          <button id="prev" title="上一个（Shift+Enter）">
-            上一个
+          <button id="prev" title={t("上一个（Shift+Enter）")}>
+            {t("上一个")}
           </button>
-          <button id="next" title="下一个（Enter）">
-            下一个
+          <button id="next" title={t("下一个（Enter）")}>
+            {t("下一个")}
           </button>
-          <button id="find-close" aria-label="关闭查找">
+          <button id="find-close" aria-label={t("关闭查找")}>
             <X aria-hidden="true" />
           </button>
         </div>
         <div>
-          <input id="replacement" aria-label="替换内容" placeholder="替换为" />
-          <button id="replace-one">替换</button>
-          <button id="replace-all">全部替换</button>
+          <input id="replacement" aria-label={t("替换内容")} placeholder={t("替换为")} />
+          <button id="replace-one">{t("替换")}</button>
+          <button id="replace-all">{t("全部替换")}</button>
         </div>
       </section>
       <div id="error" role="alert" hidden>
         <span id="error-text"></span>
-        <button id="retry">重试</button>
+        <button id="retry"></button>
       </div>
       <div id="desk-pages">
         <article>
@@ -130,49 +131,48 @@ function WritingDesk({
             <time id="modified"></time>
             <button
               id="details-open"
-              title="编辑置顶、标签和写作目标"
+              title={t("编辑置顶、标签和写作目标")}
               onClick={openDetails}
               disabled={!entry}
             >
               <Tags aria-hidden="true" />
-              手稿详情
+              {t("手稿详情")}
             </button>
           </div>
-          <input id="title" aria-label="手稿标题" placeholder="未命名手稿" autoComplete="off" disabled />
+          <input id="title" aria-label={t("手稿标题")} placeholder={t("未命名手稿")} autoComplete="off" disabled />
 
           <textarea
             id="body"
-            aria-label="正文"
-            placeholder="在这里写下正文…"
+            aria-label={t("正文")}
+            placeholder={t("在这里写下正文…")}
             spellCheck={false}
             disabled
           ></textarea>
         </article>
-        <section id="reference" hidden aria-label="只读参考稿">
+        <section id="reference" hidden aria-label={t("只读参考稿")}>
           <header>
-            <label htmlFor="ref-choice">参考稿</label>
-            <button id="ref-close" aria-label="关闭参考稿">
+            <label htmlFor="ref-choice">{t("参考稿")}</label>
+            <button id="ref-close" aria-label={t("关闭参考稿")}>
               <X aria-hidden="true" />
             </button>
           </header>
-          <select id="ref-choice" aria-label="选择参考稿"></select>
+          <select id="ref-choice" aria-label={t("选择参考稿")}></select>
           <pre id="ref-body"></pre>
         </section>
       </div>
       <footer>
-        <span id="save" role="status">
-          正在打开稿本
-        </span>
-        <button id="filepath" aria-label="打开当前保存目录"></button>
-        <button id="stats-open" onClick={openDetails} disabled={!entry} title="字数统计与写作目标">
-          <span id="count">0 字</span>
-          <progress id="goal-progress" aria-label="写作目标完成进度" hidden />
+        <span id="save" role="status"></span>
+        <button id="filepath" aria-label={t("打开当前保存目录")}></button>
+        <button id="stats-open" onClick={openDetails} disabled={!entry} title={t("字数统计与写作目标")}>
+          <span id="count"></span>
+          <progress id="goal-progress" aria-label={t("写作目标完成进度")} hidden />
         </button>
       </footer>
     </main>
   );
 }
 function Workspace() {
+  const language = useLanguage();
   const [desk, setDesk] = useState<{ entries: Entry[]; current: number | null }>({
     entries: [],
     current: null,
@@ -195,9 +195,9 @@ function Workspace() {
   const tags = useMemo(
     () =>
       Array.from(new Set(desk.entries.flatMap((n) => n.tags))).sort((a, b) =>
-        a.localeCompare(b, "zh-CN"),
+        a.localeCompare(b, locale),
       ),
-    [desk.entries],
+    [desk.entries, language],
   );
   const entry = desk.entries.find((n) => n.id === desk.current);
   const activeFilter = filter.startsWith("tag:") && !tags.includes(filter.slice(4)) ? "" : filter;

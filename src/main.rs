@@ -3,6 +3,7 @@
 mod archive;
 mod commands;
 mod files;
+mod language;
 mod memos;
 mod standby;
 mod storage;
@@ -28,7 +29,7 @@ fn open_library(app: &tauri::App) -> Result<storage::Library, Box<dyn Error>> {
             let dir = std::path::absolute(path)?;
             storage::Library::open(&dir, &dir.join("文本"))
         }
-        _ => Err("用法：QuanY.exe [--workspace 稿件目录]".into()),
+        _ => Err("Usage / 用法: QuanY.exe [--workspace DIRECTORY]".into()),
     }
 }
 
@@ -86,6 +87,7 @@ fn main() {
             commands::set_folder,
             commands::open_location,
             standby::standby_settings,
+            standby::set_language,
             standby::set_autostart,
             standby::bind_summon,
             standby::display_editor
@@ -99,7 +101,7 @@ fn main() {
 
 fn startup_error(error: &dyn Error) -> ! {
     rfd::MessageDialog::new()
-        .set_title("泉涌无法启动")
+        .set_title("QuanY could not start · 泉涌无法启动")
         .set_description(error.to_string())
         .set_level(rfd::MessageLevel::Error)
         .show();

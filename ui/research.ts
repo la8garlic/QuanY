@@ -1,3 +1,4 @@
+import { locale, t } from "./i18n";
 /** 逐行比较两版正文；长稿先剔除共同首尾，限制对照矩阵的内存。 */
 import { library, type Entry, type Written } from "./ipc.js";
 import { body, el, title, untitled } from "./view.js";
@@ -69,11 +70,11 @@ export function initResearch(
     confirming = false;
     selected = null;
     restoreButton.disabled = true;
-    restoreButton.textContent = "恢复此版";
+    restoreButton.textContent = t("恢复此版");
     const pane = el("changes");
     pane.replaceChildren();
     if (!versions.value) {
-      el("version-state").textContent = "暂无历史版本。可先保存当前版本，再继续修改。";
+      el("version-state").textContent = t("暂无历史版本。可先保存当前版本，再继续修改。");
       return;
     }
     const version = await library.version(noteId(), Number(versions.value));
@@ -88,8 +89,8 @@ export function initResearch(
       pane.append(line);
     };
     if (titleChanged) {
-      append("del", "− 标题：" + (version.title || untitled));
-      append("add", "＋ 标题：" + (title.value || untitled));
+      append("del", t("− 标题：") + (version.title || untitled()));
+      append("add", t("＋ 标题：") + (title.value || untitled()));
     }
     const interesting = lines.filter(
       (v, i) => v.kind !== "same" || lines[i - 1]?.kind !== "same" || lines[i + 1]?.kind !== "same",
@@ -98,8 +99,8 @@ export function initResearch(
       append(v.kind, { add: "＋ ", del: "− ", same: "　 " }[v.kind] + v.line);
     restoreButton.disabled = !lines.length && !titleChanged;
     el("version-state").textContent = restoreButton.disabled
-      ? "与当前稿一致"
-      : "− 历史版　＋ 当前稿" + (interesting.length > 500 ? "　仅预览前 500 行差异" : "");
+      ? t("与当前稿一致")
+      : t("− 历史版　＋ 当前稿") + (interesting.length > 500 ? t("　仅预览前 500 行差异") : "");
   }
   async function loadVersions() {
     const items = await library.revisions(noteId());
@@ -107,7 +108,7 @@ export function initResearch(
       ...items.map(
         (v) =>
           new Option(
-            new Date(v.written).toLocaleString("zh-CN") + " · " + (v.title || untitled),
+            new Date(v.written).toLocaleString(locale) + " · " + (v.title || untitled()),
             String(v.seq),
           ),
       ),
@@ -130,7 +131,7 @@ export function initResearch(
     if (!selected) return;
     if (!confirming) {
       confirming = true;
-      restoreButton.textContent = "确认恢复此版";
+      restoreButton.textContent = t("确认恢复此版");
       return;
     }
     const version = selected;
@@ -143,7 +144,7 @@ export function initResearch(
   async function readRef() {
     const token = ++refToken;
     if (!choice.value) {
-      el("ref-body").textContent = "稿本中还没有其他手稿。";
+      el("ref-body").textContent = t("稿本中还没有其他手稿。");
       return;
     }
     const text = await library.reference(Number(choice.value));
@@ -152,7 +153,7 @@ export function initResearch(
   function refOptions() {
     const id = choice.value;
     const notes = entries().filter((e) => e.id !== noteId());
-    choice.replaceChildren(...notes.map((e) => new Option(e.title || untitled, String(e.id))));
+    choice.replaceChildren(...notes.map((e) => new Option(e.title || untitled(), String(e.id))));
     if (notes.some((n) => String(n.id) === id)) choice.value = id;
     choice.disabled = !notes.length;
     void readRef().catch(report);
@@ -176,7 +177,7 @@ export function initResearch(
       list.replaceChildren();
       for (const memo of memos) {
         const b = document.createElement("button");
-        b.textContent = memo.preview.trim() || "空白便笺";
+        b.textContent = memo.preview.trim() || t("空白便笺");
         b.onclick = () =>
           void run(async () => {
             await library.openMemo(memo.id);
@@ -184,7 +185,7 @@ export function initResearch(
           }, false);
         list.append(b);
       }
-      if (!memos.length) list.textContent = "尚无便笺。新建后可把提纲钉在桌面上。";
+      if (!memos.length) list.textContent = t("尚无便笺。新建后可把提纲钉在桌面上。");
       memoList.showModal();
     });
   el("create-memo").onclick = () =>
