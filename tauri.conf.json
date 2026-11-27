@@ -1,0 +1,27 @@
+{
+  "productName": "笺记",
+  "version": "1.0.0",
+  "identifier": "cn.jianji.writer",
+  "build": { "frontendDist": "dist", "beforeBuildCommand": "npm run build" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{
+      "title": "笺记",
+      "width": 1040,
+      "height": 740,
+      "minWidth": 540,
+      "minHeight": 420,
+      "center": true,
+      "dragDropEnabled": false
+    }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'",
+      "capabilities": [{
+        "identifier": "editor",
+        "windows": ["main"],
+        "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy"]
+      }]
+    }
+  },
+  "bundle": { "active": false, "icon": ["assets/icon.ico"] }
+}

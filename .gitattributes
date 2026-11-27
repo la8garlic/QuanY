@@ -1,0 +1,4 @@
+# 统一全平台文本换行符为 LF，与 .editorconfig 保持一致
+* text=auto eol=lf
+*.png binary
+*.ico binary

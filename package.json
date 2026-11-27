@@ -1,0 +1,11 @@
+{
+  "name": "jianji",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node --input-type=module -e \"import {copyFileSync} from 'node:fs'; for (const file of ['index.html','style.css']) copyFileSync('ui/'+file,'dist/'+file)\"",
+    "release": "npm run build && cargo build --release --locked && node scripts/package.mjs"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}

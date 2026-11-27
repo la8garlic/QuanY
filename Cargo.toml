@@ -1,0 +1,28 @@
+[package]
+name = "jianji"
+version = "1.0.0"
+edition = "2021"
+description = "笺记 · 本地写作记事本"
+build = "build.rs"
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = { version = "2", features = ["custom-protocol"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+rfd = { version = "0.18", default-features = false }
+tempfile = "3"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
