@@ -22,10 +22,9 @@ function combo(e:KeyboardEvent) {
   return [e.ctrlKey && "Ctrl",e.altKey && "Alt",e.shiftKey && "Shift",e.metaKey && "Super",key==="Comma" ? "," : key].filter(Boolean).join("+");
 }
 /** 键帽按物理组合拆开，候录状态仍在原按钮内，键盘焦点不会跳走。 */
-function keycaps(id:string, action:string, chord:string, listening:boolean) {
+function keycaps(id:string, chord:string, listening:boolean) {
   const button=el<HTMLButtonElement>(id);
   button.dataset.listening=String(listening);
-  button.setAttribute("aria-label", listening ? action+"，请按组合键" : action+"，"+(chord || "未分配")+"，点击修改");
   if(listening || !chord) { button.textContent=listening ? "请按组合键…" : "未分配"; return; }
   const fragment=document.createDocumentFragment();
   chord.split("+").forEach((key,i)=>{
@@ -37,12 +36,12 @@ function keycaps(id:string, action:string, chord:string, listening:boolean) {
 }
 function draw() {
   for (const a of actions) {
-    keycaps("key-"+a,labels[a],bindings[a],recording===a);
+    keycaps("key-"+a,bindings[a],recording===a);
     el(targets[a]).title = labels[a]+(bindings[a] ? "（"+bindings[a]+"）" : "");
   }
   el("find-open").title = "查找（"+bindings.find+"） / 替换（"+bindings.replace+"）";
-  keycaps("summon-key","唤出速记窗",globalKeys.quick.key,recording==="summon");
-  keycaps("main-key","打开主窗口",globalKeys.main.key,recording==="main");
+  keycaps("summon-key",globalKeys.quick.key,recording==="summon");
+  keycaps("main-key",globalKeys.main.key,recording==="main");
   for(const hint of document.querySelectorAll<HTMLElement>("[data-shortcut]")) hint.textContent=bindings[hint.dataset.shortcut as Action];
 }
 function remember() {
@@ -94,10 +93,6 @@ export function initKeys(keys:Bindings, startup:boolean) {
     if(Object.values(globalKeys).some(b=>Object.values(defaults).includes(b.key))){info.textContent="全局键占用默认编辑键位，请先更换全局键。";return;}
     Object.assign(bindings,defaults);remember();record(null);
   };
-  // 切到其他设置时结束候录，避免隐藏的键位继续接收输入。
-  el("panel").addEventListener("focusout", event => {
-    if (recording !== null && event.target instanceof HTMLElement && event.target.dataset.listening === "true") record(null);
-  });
   el<HTMLDialogElement>("panel").addEventListener("close",()=>record(null));
   document.addEventListener("keydown",e=>{
     if(recording===null || e.isComposing)return;

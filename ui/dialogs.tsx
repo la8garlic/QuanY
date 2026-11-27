@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Folder, FolderOpen, Keyboard, Minus, Paintbrush, Plus, RotateCcw, X } from "lucide-react";
+import { Check, Folder, Keyboard, Minus, Paintbrush, Plus, X } from "lucide-react";
 import { useState } from "react";
 const sections = [
   ["system", "待命与快捷键", Keyboard],
@@ -6,13 +6,13 @@ const sections = [
   ["writing", "写作外观", Paintbrush],
 ] as const;
 type ChoiceProps = {
-  name: "theme" | "leading" | "width" | "delay";
+  name: "theme" | "leading" | "width";
   label: string;
   initial: string;
   options: [string, string][];
 };
 
-function SettingsChoice({ name, label, initial, options }: ChoiceProps) {
+function WritingChoice({ name, label, initial, options }: ChoiceProps) {
   return (
     <fieldset className={name === "theme" ? "paper-field" : "choice-field"}>
       <legend>{label}</legend>
@@ -51,56 +51,56 @@ function Settings() {
         ))}
       </div>
       <section data-settings="system" hidden={page !== "system"}>
-        <div className="preference-block">
-          <h3>托盘待命</h3>
-          <label className="setting">
-            关闭窗口后保留在托盘
-            <input id="resident" type="checkbox" role="switch" />
-          </label>
-          <label className="setting">
-            登录 Windows 后在托盘启动
-            <input id="autostart" type="checkbox" role="switch" />
-          </label>
+        <h3>随时待命</h3>
+        <label className="setting">
+          关闭窗口后保留在托盘
+          <input id="resident" type="checkbox" role="switch" />
+        </label>
+        <label className="setting">
+          登录 Windows 后在托盘启动
+          <input id="autostart" type="checkbox" role="switch" />
+        </label>
+        <div className="setting">
+          <span>全局打开主窗口</span>
+          <button id="main-key" className="keycap"></button>
         </div>
-        <div className="preference-block">
-          <h3>全局快捷键</h3>
-          <div className="setting">
-            <span>打开主窗口</span>
-            <button id="main-key" className="keycap"></button>
-          </div>
-          <div className="setting">
-            <span>唤出速记窗</span>
-            <button id="summon-key" className="keycap"></button>
-          </div>
+        <div className="setting">
+          <span>全局唤出速记窗</span>
+          <button id="summon-key" className="keycap"></button>
         </div>
         <p id="standby-info" role="status">
           点击键位后按新组合键，Esc 取消。托盘右键可保存并退出。
         </p>
         <details id="key-list">
-          <summary><Keyboard aria-hidden="true" />编辑器快捷键<ChevronDown aria-hidden="true" /></summary>
+          <summary>编辑器快捷键</summary>
           <div id="bindings"></div>
-          <button id="reset-keys"><RotateCcw aria-hidden="true" />恢复编辑器默认键位</button>
+          <button id="reset-keys">恢复编辑器默认键位</button>
         </details>
       </section>
       <section data-settings="files" hidden={page !== "files"}>
-        <div className="save-location">
-          <label htmlFor="folder">新稿默认保存目录</label>
-          <div className="folder-row">
-            <div className="path-field">
-              <Folder aria-hidden="true" />
-              <input id="folder" aria-describedby="folder-info" spellCheck={false} />
-              <button id="browse"><FolderOpen aria-hidden="true" />浏览</button>
-            </div>
-            <button id="apply-folder"><Check aria-hidden="true" />应用</button>
-          </div>
-          <p id="folder-info" role="status">
-            新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。
-          </p>
+        <h3>文件与保存</h3>
+        <label htmlFor="folder">新稿默认保存目录</label>
+        <div className="folder-row">
+          <input id="folder" spellCheck={false} />
+          <button id="browse">浏览…</button>
+          <button className="control-primary" id="apply-folder">
+            应用
+          </button>
         </div>
-        <SettingsChoice name="delay" label="停笔后自动保存" initial="650" options={[["650", "0.65 秒"], ["2000", "2 秒"], ["5000", "5 秒"]]} />
+        <p id="folder-info" role="status">
+          新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。
+        </p>
+        <label className="setting">
+          停笔后自动保存
+          <select id="delay">
+            <option value="650">0.65 秒</option>
+            <option value="2000">2 秒</option>
+            <option value="5000">5 秒</option>
+          </select>
+        </label>
       </section>
       <section data-settings="writing" hidden={page !== "writing"}>
-        <SettingsChoice name="theme" label="纸张" initial="paper" options={[["paper", "米白"], ["night", "夜色"]]} />
+        <WritingChoice name="theme" label="纸张" initial="paper" options={[["paper", "米白"], ["night", "夜色"]]} />
         <div className="settings-grid">
           <label className="setting">
             字体
@@ -122,8 +122,8 @@ function Settings() {
               </button>
             </div>
           </div>
-          <SettingsChoice name="leading" label="行距" initial="1.75" options={[["1.5", "紧凑"], ["1.75", "标准"], ["1.95", "宽松"]]} />
-          <SettingsChoice name="width" label="正文宽度" initial="reading" options={[["reading", "阅读宽度"], ["full", "铺满窗口"]]} />
+          <WritingChoice name="leading" label="行距" initial="1.75" options={[["1.5", "紧凑"], ["1.75", "标准"], ["1.95", "宽松"]]} />
+          <WritingChoice name="width" label="正文宽度" initial="reading" options={[["reading", "阅读宽度"], ["full", "铺满窗口"]]} />
           <label className="setting wrap-row">
             自动换行
             <input id="wrap" type="checkbox" role="switch" />
