@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Cargo 可使用全局构建缓存，交付位置固定，便于直接双击启动。
@@ -16,9 +16,5 @@ try {
   copyFileSync(exe, target);
 }
 // Explorer 可在原路径上继续使用上个版本的大图标；发布后通知 Shell 重新读取图像缓存。
-execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", [
-  "$ErrorActionPreference='Stop'",
-  "Add-Type -Namespace QuanY -Name Shell -MemberDefinition '[System.Runtime.InteropServices.DllImport(\"shell32.dll\")] public static extern void SHChangeNotify(int evt, uint flags, System.IntPtr first, System.IntPtr second);'",
-  "[QuanY.Shell]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)",
-].join("\n")], { windowsHide: true });
+execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", readFileSync("scripts/notify-shell.ps1", "utf8")], { windowsHide: true });
 console.log("已生成 " + target);

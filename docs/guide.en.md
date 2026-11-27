@@ -12,6 +12,10 @@ To check that your download matches the release, compare the output below with `
 Get-FileHash .\QuanY.exe -Algorithm SHA256
 ```
 
+## Open TXT files from Explorer
+
+Open QuanY once from the folder where you keep the executable. In **Settings → Files & saving → Default app for TXT files**, choose **Choose in Windows…** and select **泉涌 QuanY** for `.txt`. You can also right-click a TXT, choose **Open with**, select QuanY and choose **Always**. If you move the executable, quit from the tray and start it at its new location to refresh the registration.
+
 ## Default shortcuts
 
 | Keys | Action |

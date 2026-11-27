@@ -37,6 +37,7 @@ function Settings() {
   const [notices, setNotices] = useState("");
   const [switching, setSwitching] = useState(false);
   const [languageError, setLanguageError] = useState("");
+  const [associationError, setAssociationError] = useState("");
   const [page, setPage] = useState<string>("system");
   return (
     <><dialog id="panel" aria-labelledby="settings-title">
@@ -108,6 +109,15 @@ function Settings() {
       </section>
       <section data-settings="files" hidden={page !== "files"}>
         <h3>{t("文件与保存")}</h3>
+        <div className="setting">
+          <span>{t("TXT 默认打开方式")}</span>
+          <button onClick={async () => {
+            setAssociationError("");
+            try { await standby.openDefaultApps(); }
+            catch (error) { setAssociationError(String(error)); }
+          }}>{t("在 Windows 中设置…")}</button>
+        </div>
+        {associationError && <p role="alert">{associationError}</p>}
         <label htmlFor="folder">{t("新稿默认保存目录")}</label>
         <div className="folder-row">
           <input id="folder" spellCheck={false} />
