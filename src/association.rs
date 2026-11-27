@@ -6,6 +6,7 @@ use winreg::{
     RegKey, RegValue,
 };
 
+const APP_NAME: &str = "泉涌 QuanY";
 const PROG_ID: &str = "QuanY.Text";
 const CAPABILITIES: &str = r"Software\QuanY\Capabilities";
 
@@ -42,9 +43,9 @@ fn register() -> io::Result<()> {
             "",
             command.as_str(),
         ),
-        (&app, "ApplicationName", "泉涌 QuanY"),
+        (&app, "ApplicationName", APP_NAME),
         (&app, "ApplicationIcon", &icon),
-        (&caps, "ApplicationName", "泉涌 QuanY"),
+        (&caps, "ApplicationName", APP_NAME),
         (&caps, "ApplicationIcon", &icon),
         (
             &caps,
@@ -54,7 +55,7 @@ fn register() -> io::Result<()> {
         (&caps.create_subkey("FileAssociations")?.0, ".txt", PROG_ID),
         (
             &user.create_subkey(r"Software\RegisteredApplications")?.0,
-            "QuanY",
+            APP_NAME,
             CAPABILITIES,
         ),
     ] {
@@ -102,10 +103,12 @@ pub async fn register_txt_handler() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_default_apps() -> Result<(), String> {
+    let mut settings = tauri::Url::parse("ms-settings:defaultapps").expect("valid settings URI");
+    settings.set_query(Some(&format!("registeredAppUser={APP_NAME}")));
     register()
         .and_then(|()| {
             Command::new(windows_dir()?.join("explorer.exe"))
-                .arg("ms-settings:defaultapps?registeredAppUser=QuanY")
+                .arg(settings.as_str())
                 .spawn()
                 .map(|_| ())
         })
