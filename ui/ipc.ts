@@ -9,6 +9,8 @@ export interface Saved { entry: Entry; path: string }
 interface DesktopWindow {
   onCloseRequested(handler: (event: { preventDefault(): void }) => Promise<void>): Promise<() => void>;
   destroy(): Promise<void>;
+  hide(): Promise<void>;
+  listen<T>(name:string,handler:(event:{payload:T})=>void):Promise<()=>void>;
 }
 declare global {
   interface Window {
@@ -35,3 +37,12 @@ export const library = {
 };
 /** 宿主发出关闭请求后，编辑器可等最后一笔写入落盘再销毁窗口。 */
 export const desktop = window.__TAURI__.window.getCurrentWindow();
+
+export interface Binding {key:string;issue:string|null}
+/** 桌面设置的应答反映实际系统注册结果。 */
+export const standby = {
+  read: () => invoke<{binding:Binding;autostart:boolean;compact:boolean}>("standby_settings"),
+  startup: (enabled:boolean) => invoke<boolean>("set_autostart",{enabled}),
+  bind: (key:string) => invoke<Binding>("bind_summon",{key}),
+  display: (compact:boolean) => invoke<void>("display_editor",{compact}),
+};

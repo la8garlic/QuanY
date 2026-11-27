@@ -2,6 +2,7 @@
 
 mod commands;
 mod files;
+mod standby;
 mod storage;
 mod text;
 
@@ -9,7 +10,10 @@ use std::{env, error::Error, path::PathBuf};
 use tauri::Manager;
 
 fn workspace(app: &tauri::App) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let args: Vec<_> = env::args_os().skip(1).collect();
+    let args: Vec<_> = env::args_os()
+        .skip(1)
+        .filter(|arg| arg != "--background")
+        .collect();
     match args.as_slice() {
         [] => Ok((
             app.path().app_local_data_dir()?,
@@ -24,7 +28,24 @@ fn workspace(app: &tauri::App) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
 }
 
 fn main() {
-    let result = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    if !env::args_os().any(|s| s == "--workspace") {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if !args.iter().any(|s| s == "--background") {
+                standby::signal(app, "full");
+            }
+        }));
+    }
+    let result = builder
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        standby::signal(app, "quick");
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let library =
                 workspace(app).and_then(|(dir, texts)| storage::Library::open(&dir, &texts));
@@ -33,6 +54,14 @@ fn main() {
                     app.manage(library);
                 }
                 Err(error) => startup_error(error.as_ref()),
+            }
+            if let Err(e) = standby::install(app) {
+                startup_error(e.as_ref());
+            }
+            if !env::args_os().any(|s| s == "--background") {
+                app.get_webview_window("main")
+                    .expect("主窗口已配置")
+                    .show()?;
             }
             Ok(())
         })
@@ -47,7 +76,11 @@ fn main() {
             commands::open_text,
             commands::choose_folder,
             commands::set_folder,
-            commands::open_location
+            commands::open_location,
+            standby::standby_settings,
+            standby::set_autostart,
+            standby::bind_summon,
+            standby::display_editor
         ])
         .build(tauri::generate_context!());
     match result {

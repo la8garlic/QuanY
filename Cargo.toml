@@ -1,6 +1,6 @@
 [package]
 name = "jianji"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "笺记 · 本地写作记事本"
 build = "build.rs"
@@ -9,7 +9,10 @@ build = "build.rs"
 tauri-build = "2"
 
 [dependencies]
-tauri = { version = "2", features = ["custom-protocol"] }
+tauri = { version = "2", features = ["custom-protocol", "tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+winreg = "0.56"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 rfd = { version = "0.18", default-features = false }

@@ -1,12 +1,13 @@
 {
   "productName": "笺记",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "identifier": "cn.jianji.writer",
   "build": { "frontendDist": "dist", "beforeBuildCommand": "npm run build" },
   "app": {
     "withGlobalTauri": true,
     "windows": [{
       "title": "笺记",
+      "visible": false,
       "width": 1040,
       "height": 740,
       "minWidth": 540,
@@ -19,7 +20,7 @@
       "capabilities": [{
         "identifier": "editor",
         "windows": ["main"],
-        "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy"]
+        "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy","core:window:allow-hide"]
       }]
     }
   },

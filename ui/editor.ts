@@ -1,4 +1,5 @@
-import { desktop, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
+import { initKeys, localAction } from "./shortcuts.js";
+import { desktop, standby, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
 import { body, count, el, list, search, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
 
@@ -214,34 +215,61 @@ confirm.onclose = () => {
   });
 };
 
-document.addEventListener("keydown", e => {
-  const key = e.key.toLowerCase();
-  // 桌面编辑器里刷新页面会绕过关闭保存流程。
-  if (key === "f5" || (e.ctrlKey && key === "r")) e.preventDefault();
-  if (e.isComposing || !ready || confirm.open || el<HTMLDialogElement>("panel").open) return;
-  if (key === "enter" && e.target === title) { e.preventDefault(); body.focus(); }
-  if (e.ctrlKey && !e.altKey && ["n", "o", "s", ",", "f", "h"].includes(key)) {
-    e.preventDefault();
-    if (key === "n") el("new").click();
-    if (key === "o") el("open-file").click();
-    if (key === "s" && e.shiftKey) el("save-as").click();
-    if (key === "s" && !e.shiftKey) el("save-file").click();
-    if (key === ",") el("options").click();
-    if (key === "f" || key === "h") openFind(key === "h");
+function isQuick() { return document.body.classList.contains("quick"); }
+function quickLayout(on:boolean) {
+  document.body.classList.toggle("quick",on);
+  el("quick-toggle").textContent=on?"展开主窗口":"速记窗";
+}
+type Intent="quick"|"full"|"quit"|"hide";
+function dispatch(intent:Intent) {
+  // 所有隐藏和退出都走保存门槛，写盘失败时用户仍能看到错误并另存为。
+  if(intent==="hide" || intent==="quit"){
+    body.blur();title.blur();
+    return action(()=>intent==="hide" ? desktop.hide() : desktop.destroy());
   }
-  if (key === "f8") { e.preventDefault(); el("focus").click(); }
-  if (key === "escape" && document.body.classList.contains("focused")) setFocusMode(false);
+  return action(async()=>{
+    if(intent==="quick" && !confirm.open){
+      el<HTMLDialogElement>("panel").close();
+      resetFind();
+    }
+    const quick=intent==="quick";
+    await standby.display(quick);
+    quickLayout(quick);
+    body.focus();
+  },false);
+}
+el("quick-toggle").onclick=()=>dispatch(isQuick()?"full":"quick");
+el("quick-new").onclick=()=>el("new").click();
+el("stow").onclick=()=>dispatch("hide");
+document.addEventListener("keydown", e => {
+  const key=e.key.toLowerCase();
+  if(key==="f5" || (e.ctrlKey && key==="r"))e.preventDefault();
+  if(e.isComposing || !ready || confirm.open || el<HTMLDialogElement>("panel").open) return;
+  if(key==="enter" && e.target===title){e.preventDefault();body.focus();}
+  const command=localAction(e);
+  if(command){
+    e.preventDefault();
+    if(e.repeat)return;
+    if(command==="find" || command==="replace") openFind(command==="replace");
+    else {
+      const target={new:"new",open:"open-file",save:"save-file",saveAs:"save-as",settings:"options",focus:"focus",quick:"quick-toggle"}[command];
+      el(target).click();
+    }
+  } else if(key==="escape" && isQuick()){e.preventDefault();void dispatch("hide");}
+  else if(key==="escape" && document.body.classList.contains("focused"))setFocusMode(false);
 });
 
 async function boot() {
   try {
     show(await library.start());
+    const prefs=await standby.read();
+    initKeys(prefs.binding,prefs.autostart);
+    quickLayout(prefs.compact);
+    if(prefs.binding.issue)errorMessage(prefs.binding.issue);
+    await desktop.listen<Intent>("standby-action", e=>{void dispatch(e.payload);});
     await desktop.onCloseRequested(async e => {
       e.preventDefault();
-      if (busy) return;
-      body.blur();
-      title.blur();
-      await action(() => desktop.destroy());
+      await dispatch(el<HTMLInputElement>("resident").checked ? "hide":"quit");
     });
     title.disabled = body.disabled = false;
     ready = true;

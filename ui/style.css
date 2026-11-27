@@ -107,3 +107,19 @@ footer { gap: 14px; }
   article { --gutter: 18px; }
   footer { padding-inline: 10px; gap: 7px; }
 }
+
+#quick-new, #stow { display:none; }
+body.quick { grid-template-columns:minmax(0,1fr); }
+body.quick aside, body.quick .bar > :is(#open-file,#save-file,#save-as,#focus,#find-open,#options) { display:none; }
+body.quick :is(#quick-new,#stow) { display:inline-block; }
+body.quick .bar { height:36px; padding:0 10px; }
+body.quick article { width:100%; padding:4px 15px 0; }
+body.quick #title { font-size:19px; padding:2px 0; }
+body.quick .rule { margin:1px 0 5px; }
+body.quick #body { font-size:min(var(--text-size),20px); line-height:1.5; padding-bottom:4px; }
+body.quick footer { padding:3px 12px; }
+.keycap { border:1px solid var(--line); min-width:100px; font:13px Consolas,"Microsoft YaHei UI",sans-serif; }
+#key-list { margin-top:10px; }
+#key-list summary { cursor:pointer; color:var(--accent); }
+#bindings { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:2px 14px; margin:7px 0; }
+#reset-keys { background:var(--side); }
