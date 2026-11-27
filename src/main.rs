@@ -2,6 +2,7 @@
 
 mod archive;
 mod association;
+mod chunks;
 mod commands;
 mod files;
 mod language;
@@ -103,7 +104,8 @@ fn main() {
             commands::set_details,
             commands::select_note,
             commands::create_note,
-            commands::save_note,
+            commands::stage_note,
+            commands::publish_note,
             commands::bookmark,
             commands::delete_note,
             commands::save_as,

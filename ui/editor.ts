@@ -1,8 +1,9 @@
+import { ChangeSet, type Text } from "@codemirror/state";
 import { locale, onLanguageChange, t } from "./i18n";
 import { initResearch } from "./research.js";
 import { literalSearch } from "./search";
 import { initKeys, localAction } from "./shortcuts.js";
-import { desktop, standby, library, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
+import { desktop, standby, library, type DraftEdits, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
 import { writing, loadWriting, selectText, lockWriting, onTextChange } from "./writing";
 import { count, el, setGoal, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
@@ -17,7 +18,9 @@ let pending: Promise<void> | undefined;
 let quiet: number, deadline: number | undefined;
 let ready = false, busy = false;
 let path: string | null;
-let savedTitle: string, savedBody: string, txtPending: boolean;
+let savedTitle: string, savedBody: Text, txtPending: boolean;
+let staged = 0, changes = ChangeSet.empty(0);
+let sending: {version: number; doc: Text; note: DraftEdits} | undefined;
 let folder: string;
 const confirm = el<HTMLDialogElement>("confirm");
 
@@ -36,10 +39,12 @@ function open(note: Note, clearSearch = false) {
   loadWriting(note.body, lastPlace);
   path = note.path;
   savedTitle = note.title;
-  savedBody = note.body;
+  savedBody = writing.state.doc;
+  changes = ChangeSet.empty(savedBody.length);
+  sending = undefined;
   txtPending = note.pending;
   committed = 0;
-  revision = note.pending ? 1 : 0;
+  staged = revision = note.pending ? 1 : 0;
   displayPath();
   resetFind();
   el("error").hidden = true;
@@ -82,23 +87,67 @@ function saved(result: Saved) {
   publish(entries, current, false);
 }
 
-async function write() {
-  // 同一时刻仅允许一笔写入。等待磁盘时仍可输入，旧应答只确认它携带的版本。
-  while (committed < revision) {
-    const version = revision, text = writing.state.doc.toString(), name = title.value;
-    // 撤销回上次保存的内容时也跳过写盘；失败的写入仍需清理待写记录。
-    if (path && !txtPending && text === savedBody && name === savedTitle) {
-      committed = version;
-      continue;
+function draftLabel(doc: Text, name: string) {
+  let first = name.trim();
+  if (!first) {
+    const lines = doc.iterLines();
+    for (let line = lines.next(); !line.done; line = lines.next()) {
+      first = line.value.trimStart();
+      if (first) break;
     }
-    status("正在保存", "dirty");
-    const place = position();
+  }
+  // 目录预览最多 80 个码点，无需展开长段的剩余文字。
+  return Array.from(first.slice(0, 160)).slice(0, 80).join("");
+}
+
+function encodeEdits(batch: ChangeSet, before: Text, after: Text): DraftEdits["edits"] {
+  const ranges: {from: number; to: number; start: number; end: number}[] = [];
+  const splitsPair = (doc: Text, pos: number) =>
+    pos > 0 && pos < doc.length && /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(doc.sliceString(pos - 1, pos + 1));
+  // DOM 差分可以只改变一个代理码元。跨进程传输时两侧都扩到完整字符。
+  batch.iterChangedRanges((from,to,start,end) => {
+    if (splitsPair(before,from) || splitsPair(after,start)) { from--; start--; }
+    if (splitsPair(before,to) || splitsPair(after,end)) { to++; end++; }
+    const previous = ranges.at(-1);
+    if (previous && from <= previous.to) { previous.to = Math.max(previous.to,to); previous.end = Math.max(previous.end,end); }
+    else ranges.push({from,to,start,end});
+  });
+  return ranges.map(({from,to,start,end}) => ({from,to,insert:after.sliceString(start,end)}));
+}
+
+async function stage() {
+  if (staged < revision) {
+    if (!sending) {
+      const doc = writing.state.doc, name = title.value;
+      if (path && !txtPending && doc.eq(savedBody) && name === savedTitle) {
+        changes = ChangeSet.empty(doc.length);
+        committed = staged = revision;
+        return;
+      }
+      sending = {version: revision, doc, note: {id:current, title:name, label:draftLabel(doc,name),
+        place:position(), token:crypto.randomUUID(), length:changes.length, edits:encodeEdits(changes,savedBody,doc)}};
+      changes = ChangeSet.empty(doc.length);
+    }
+    // 等待应答时新的编辑进入下一批；失败保留原收据，按同一批次重试。
+    await library.stage(sending.note);
+    savedBody = sending.doc;
+    savedTitle = sending.note.title;
+    lastPlace = sending.note.place;
+    staged = sending.version;
     txtPending = true;
-    const result = await library.save({id:current, title:name, body:text, place});
+    sending = undefined;
+  }
+}
+
+async function write() {
+  while (committed < revision) {
+    if (composing && !busy) return;
+    status("正在保存", "dirty");
+    await stage();
+    if (committed === revision) break;
+    const version = staged;
+    const result = await library.publish(current);
     txtPending = false;
-    savedTitle = name;
-    savedBody = text;
-    lastPlace = place;
     committed = version;
     saved(result);
   }
@@ -141,7 +190,8 @@ function changed() {
   scheduleSave();
 }
 title.oninput = changed;
-onTextChange(() => {
+onTextChange(update => {
+  changes = changes.compose(update.changes);
   changed();
   count();
 });
@@ -245,13 +295,12 @@ el("save-as").onclick = () => action(async () => {
   if (pending) await flush();
   try {
     const place = position();
-    const dirty = revision !== committed;
-    if (dirty) txtPending = true; // 打开选择器前，后端会先提交恢复稿。
-    const result = await library.saveAs({id:current, title:title.value, body:writing.state.doc.toString(), place}, dirty);
+    while (staged < revision) await stage();
+    await library.bookmark(current, place);
+    lastPlace = place;
+    const result = await library.saveAs(current);
     if (result) {
       txtPending = false;
-      savedTitle = title.value;
-      savedBody = writing.state.doc.toString();
       committed = revision;
       lastPlace = place;
       saved(result);

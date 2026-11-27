@@ -106,6 +106,21 @@ impl Library {
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, label TEXT NOT NULL, body TEXT NOT NULL,
                  modified INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER))
              );
+             CREATE TABLE IF NOT EXISTS draft_pieces (
+                 note INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE, part INTEGER NOT NULL,
+                 start_byte INTEGER NOT NULL, keep_bytes INTEGER NOT NULL, addition TEXT NOT NULL,
+                 PRIMARY KEY(note,part)
+             ) WITHOUT ROWID;
+             CREATE TABLE IF NOT EXISTS stage_receipts (
+                 note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE, token TEXT NOT NULL
+             );
+             CREATE TRIGGER IF NOT EXISTS clear_draft_pieces AFTER UPDATE OF body ON notes
+             BEGIN DELETE FROM draft_pieces WHERE note=NEW.id; END;
+             CREATE VIEW IF NOT EXISTS manuscript_text AS SELECT id,title,label,modified,
+                 CASE WHEN EXISTS(SELECT 1 FROM draft_pieces WHERE note=n.id)
+                 THEN (SELECT group_concat(CAST(substr(CAST(n.body AS BLOB),start_byte+1,keep_bytes) AS TEXT)||addition,'' ORDER BY part)
+                       FROM draft_pieces WHERE note=n.id)
+                 ELSE body END AS body FROM notes AS n;
              CREATE TABLE IF NOT EXISTS details (
                  note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
                  pinned INTEGER NOT NULL, tags TEXT NOT NULL, goal INTEGER NOT NULL CHECK(goal>=0)
@@ -153,7 +168,7 @@ impl Library {
 fn read_note(db: &Connection, id: i64) -> rusqlite::Result<Note> {
     db.query_row("SELECT n.id,n.title,n.body,n.modified,coalesce(p.start,0),coalesce(p.end,0),coalesce(p.top,0),
                          l.path, EXISTS(SELECT 1 FROM outbox WHERE note=n.id)
-                  FROM notes n LEFT JOIN places p ON p.note=n.id LEFT JOIN links l ON l.note=n.id WHERE n.id=?1", [id], |r| Ok(Note {
+                  FROM manuscript_text n LEFT JOIN places p ON p.note=n.id LEFT JOIN links l ON l.note=n.id WHERE n.id=?1", [id], |r| Ok(Note {
         id: r.get(0)?,
         title: r.get(1)?,
         body: r.get(2)?,
@@ -180,7 +195,7 @@ pub fn desk(db: &Connection) -> rusqlite::Result<Desk> {
     })
 }
 
-fn read_entry(db: &Connection, id: i64) -> rusqlite::Result<Entry> {
+pub fn read_entry(db: &Connection, id: i64) -> rusqlite::Result<Entry> {
     db.query_row(
         "SELECT id,label,modified,pinned,tags,goal FROM catalog WHERE id=?1",
         [id],
@@ -238,11 +253,19 @@ fn label(title: &str, body: &str) -> String {
 }
 
 pub fn reload_body(db: &Connection, id: i64, body: &str) -> rusqlite::Result<()> {
+    let different: bool = db.query_row(
+        "SELECT body<>?2 FROM manuscript_text WHERE id=?1",
+        params![id, body],
+        |r| r.get(0),
+    )?;
+    if !different {
+        return Ok(());
+    }
     crate::archive::checkpoint(db, id, false)?;
     let title: String = db.query_row("SELECT title FROM notes WHERE id=?1", [id], |r| r.get(0))?;
     db.execute(
         "UPDATE notes SET body=?2,label=?3,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
-        WHERE id=?1 AND body<>?2",
+        WHERE id=?1",
         params![id, body, label(&title, body)],
     )?;
     Ok(())
@@ -278,26 +301,27 @@ pub fn bookmark(db: &Connection, id: i64, place: &Place) -> rusqlite::Result<()>
     Ok(())
 }
 
-pub fn save(
-    db: &mut Connection,
-    id: i64,
-    title: &str,
-    body: &str,
-    place: &Place,
-) -> rusqlite::Result<Entry> {
+/// 收据与改动在同一事务落盘，IPC 回执丢失时重发不会重复插字。
+pub fn stage(db: &mut Connection, note: &crate::commands::DraftEdits) -> crate::files::Result<()> {
     let tx = db.transaction()?;
-    crate::archive::checkpoint(&tx, id, false)?;
-    tx.execute(
-        "UPDATE notes SET title=?1,body=?2,label=?4,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
-         WHERE id=?3",
-        params![title, body, id, label(title, body)],
+    let id = note.id;
+    let repeated: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM stage_receipts WHERE note=?1 AND token=?2)",
+        params![id, note.token],
+        |r| r.get(0),
     )?;
-    let result = read_entry(&tx, id)?;
-    bookmark(&tx, id, place)?;
-    // 原文件可能位于离线盘；先提交恢复稿，成功写出 TXT 后才清除此标记。
+    if repeated {
+        return Ok(());
+    }
+    crate::archive::checkpoint(&tx, id, false)?;
+    crate::chunks::apply(&tx, id, note.length, &note.edits)?;
+    tx.execute("UPDATE notes SET title=?2,label=?3,modified=CAST(unixepoch('subsec')*1000 AS INTEGER) WHERE id=?1",
+        params![id,note.title,note.label])?;
+    bookmark(&tx, id, &note.place)?;
     tx.execute("INSERT OR IGNORE INTO outbox VALUES(?1)", [id])?;
+    tx.execute("INSERT INTO stage_receipts(note,token) VALUES(?1,?2) ON CONFLICT(note) DO UPDATE SET token=excluded.token",params![id,note.token])?;
     tx.commit()?;
-    Ok(result)
+    Ok(())
 }
 
 pub fn delete(db: &mut Connection, id: i64) -> rusqlite::Result<Desk> {

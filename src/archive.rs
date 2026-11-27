@@ -6,10 +6,10 @@ use tauri::State;
 
 pub fn checkpoint(db: &Connection, id: i64, force: bool) -> rusqlite::Result<()> {
     let inserted=db.execute("INSERT INTO revisions(note,title,body,written)
-        SELECT id,title,body,modified FROM notes WHERE id=?1 AND (title<>'' OR body<>'')
+        SELECT id,title,body,modified FROM manuscript_text AS n WHERE id=?1 AND (title<>'' OR body<>'')
         AND (?2 OR NOT EXISTS(SELECT 1 FROM revisions WHERE note=?1 AND created>unixepoch()-600))
         AND NOT EXISTS(SELECT 1 FROM revisions r WHERE r.seq=(SELECT max(seq) FROM revisions WHERE note=?1)
-                       AND r.title=notes.title AND r.body=notes.body)",params![id,force])?;
+                       AND r.title=n.title AND r.body=n.body)",params![id,force])?;
     if inserted > 0 {
         db.execute(
             "DELETE FROM revisions WHERE note=?1 AND seq NOT IN
@@ -48,7 +48,7 @@ pub async fn search_notes(term: String, state: State<'_, Library>) -> Result<Vec
         .map_err(|e| e.to_string())?;
     query(&state, |db| {
         let mut stmt = db.prepare(
-            "SELECT id,label,modified,title,body FROM notes ORDER BY modified DESC,id DESC",
+            "SELECT id,label,modified,title,body FROM manuscript_text ORDER BY modified DESC,id DESC",
         )?;
         let mut rows = stmt.query([])?;
         let mut hits = Vec::new();
@@ -78,14 +78,16 @@ pub async fn search_notes(term: String, state: State<'_, Library>) -> Result<Vec
 #[tauri::command]
 pub async fn reference_note(id: i64, state: State<'_, Library>) -> Result<Written, String> {
     query(&state, |db| {
-        Ok(
-            db.query_row("SELECT title,body FROM notes WHERE id=?1", [id], |r| {
+        Ok(db.query_row(
+            "SELECT title,body FROM manuscript_text WHERE id=?1",
+            [id],
+            |r| {
                 Ok(Written {
                     title: r.get(0)?,
                     body: r.get(1)?,
                 })
-            })?,
-        )
+            },
+        )?)
     })
 }
 

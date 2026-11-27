@@ -18,11 +18,14 @@ pub(crate) fn query<T>(
 }
 
 #[derive(Deserialize)]
-pub struct Snapshot {
-    id: i64,
-    title: String,
-    body: String,
-    place: Place,
+pub struct DraftEdits {
+    pub id: i64,
+    pub title: String,
+    pub label: String,
+    pub place: Place,
+    pub token: String,
+    pub length: usize,
+    pub edits: Vec<crate::chunks::Edit>,
 }
 
 #[derive(Serialize)]
@@ -31,22 +34,33 @@ pub struct Saved {
     path: String,
 }
 
-fn write(db: &mut Connection, n: &Snapshot, target: Option<&Path>) -> files::Result<Saved> {
-    let entry = storage::save(db, n.id, &n.title, &n.body, &n.place)?;
-    let name = if n.title.trim().is_empty() {
-        n.body.trim_start().lines().next().unwrap_or("")
+fn publish(db: &mut Connection, id: i64, target: Option<&Path>) -> files::Result<Saved> {
+    let (title, body): (String, String) = db.query_row(
+        "SELECT title,body FROM manuscript_text WHERE id=?1",
+        [id],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let entry = storage::read_entry(db, id)?;
+    let name = if title.trim().is_empty() {
+        body.trim_start().lines().next().unwrap_or("")
     } else {
-        &n.title
+        &title
     };
-    let path = files::publish(db, n.id, name, &n.body, target).map_err(|e| {
-        format!(
-            "{} {e}",
-            tr(
-                "恢复稿已保存，TXT 尚未写入：",
-                "Recovery copy saved. Could not write the TXT file:"
+    let path = match files::publish(db, id, name, &body, target) {
+        Ok(path) => path,
+        Err(error) => {
+            // 原文件离线或冲突时仍保留完整恢复稿，待写标记留到重试成功。
+            crate::chunks::consolidate(db, id, &body)?;
+            return Err(format!(
+                "{} {error}",
+                tr(
+                    "恢复稿已保存，TXT 尚未写入：",
+                    "Recovery copy saved. Could not write the TXT file:"
+                )
             )
-        )
-    })?;
+            .into());
+        }
+    };
     Ok(Saved { entry, path })
 }
 
@@ -101,8 +115,13 @@ pub async fn create_note(
 
 /// 保存到已关联的文件，或在默认目录中为新稿创建文件。
 #[tauri::command]
-pub async fn save_note(note: Snapshot, state: State<'_, Library>) -> Result<Saved, String> {
-    state.with_files(move |db| write(db, &note, None)).await
+pub async fn stage_note(note: DraftEdits, state: State<'_, Library>) -> Result<(), String> {
+    state.with_files(move |db| storage::stage(db, &note)).await
+}
+
+#[tauri::command]
+pub async fn publish_note(id: i64, state: State<'_, Library>) -> Result<Saved, String> {
+    state.with_files(move |db| publish(db, id, None)).await
 }
 
 /// 阅读位置独立写入，避免改变稿件修改时间。
@@ -146,28 +165,18 @@ pub async fn open_text(window: Window, state: State<'_, Library>) -> Result<Opti
 #[tauri::command]
 pub async fn save_as(
     window: Window,
-    note: Snapshot,
-    dirty: bool,
+    id: i64,
     state: State<'_, Library>,
 ) -> Result<Option<Saved>, String> {
-    let (folder, note) = state
-        .with_files(move |db| {
-            // 文件选择器可能一直打开，先保住尚未进入自动保存周期的末次输入。
-            if dirty {
-                storage::save(db, note.id, &note.title, &note.body, &note.place)?;
-            }
-            Ok((files::folder(db)?, note))
-        })
-        .await?;
-    let name = if note.title.trim().is_empty() {
-        note.body.trim_start().lines().next().unwrap_or("")
-    } else {
-        &note.title
-    };
+    let (folder, name) = query(&state, |db| {
+        let name: String =
+            db.query_row("SELECT label FROM notes WHERE id=?1", [id], |r| r.get(0))?;
+        Ok((files::folder(db)?, name))
+    })?;
     let file = rfd::AsyncFileDialog::new()
         .set_parent(&window)
         .set_directory(folder)
-        .set_file_name(files::filename(name))
+        .set_file_name(files::filename(&name))
         .set_title(tr("另存为", "Save as"))
         .add_filter(tr("纯文本", "Plain text"), &["txt"])
         .save_file()
@@ -175,7 +184,7 @@ pub async fn save_as(
     match file {
         Some(file) => {
             state
-                .with_files(move |db| write(db, &note, Some(file.path())).map(Some))
+                .with_files(move |db| publish(db, id, Some(file.path())).map(Some))
                 .await
         }
         None => Ok(None),

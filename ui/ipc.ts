@@ -3,6 +3,7 @@ export interface Details { pinned: boolean; tags: string[]; goal: number }
 export interface Entry extends Details { id: number; title: string; modified: number }
 export interface Place { start: number; end: number; top: number }
 export interface Snapshot {id:number;title:string;body:string;place:Place}
+export interface DraftEdits {id:number;title:string;label:string;place:Place;token:string;length:number;edits:{from:number;to:number;insert:string}[]}
 export interface Note extends Snapshot { modified:number; path: string | null; pending: boolean; notice: string | null }
 export interface Desk { entries: Entry[]; note: Note; folder:string }
 export interface Written {title:string;body:string}
@@ -46,13 +47,14 @@ export const library = {
   start: () => invoke<Desk>("start"),
   select: (id: number) => invoke<Note>("select_note", { id }),
   create: (title: string, body: string) => invoke<Desk>("create_note", { title, body }),
-  save: (note: Snapshot) => invoke<Saved>("save_note", { note }),
+  stage: (note: DraftEdits) => invoke<void>("stage_note", {note}),
+  publish: (id: number) => invoke<Saved>("publish_note", {id}),
   bookmark: (id: number, place: Place) => invoke<void>("bookmark", { id, place }),
   remove: (id: number) => invoke<Desk>("delete_note", { id }),
   hasShellFiles: () => invoke<boolean>("has_shell_files"),
   openNextTxt: () => invoke<Desk | null>("open_next_txt"),
   open: () => invoke<Desk|null>("open_text"),
-  saveAs: (note:Snapshot, dirty:boolean) => invoke<Saved|null>("save_as",{note,dirty}),
+  saveAs: (id:number) => invoke<Saved|null>("save_as",{id}),
   chooseFolder: () => invoke<string|null>("choose_folder"),
   setFolder: (path:string) => invoke<string>("set_folder",{path}),
   openLocation: (id:number) => invoke<void>("open_location",{id}),
