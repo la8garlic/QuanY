@@ -1,7 +1,8 @@
 import { locale, t } from "./i18n";
 /** 逐行比较两版正文；长稿先剔除共同首尾，限制对照矩阵的内存。 */
 import { library, type Entry, type Written } from "./ipc.js";
-import { body, el, title, untitled } from "./view.js";
+import { writing } from "./writing";
+import { el, title, untitled } from "./view.js";
 type Change = { kind: "add" | "del" | "same"; line: string };
 
 function changes(oldText: string, newText: string): Change[] {
@@ -80,7 +81,7 @@ export function initResearch(
     const version = await library.version(noteId(), Number(versions.value));
     if (token !== historyToken || !history.open) return;
     selected = version;
-    const lines = changes(version.body, body.value),
+    const lines = changes(version.body, writing.state.doc.toString()),
       titleChanged = version.title !== title.value;
     const append = (kind: string, text: string) => {
       const line = document.createElement("div");
@@ -166,7 +167,7 @@ export function initResearch(
   el("ref-close").onclick = () => {
     ref.hidden = true;
     el("reference-open").setAttribute("aria-pressed", "false");
-    body.focus();
+    writing.focus();
   };
   choice.onchange = () => void readRef().catch(report);
   const memoList = el<HTMLDialogElement>("memo-list");

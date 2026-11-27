@@ -5,8 +5,7 @@ export function characterCount(text: string) {
   return n;
 }
 
-export function manuscriptStats(body: HTMLTextAreaElement) {
-  const text = body.value;
+export function manuscriptStats(text: string, from: number, to: number) {
   let lines = text ? 1 : 0,
     paragraphs = 0,
     inParagraph = false,
@@ -23,7 +22,7 @@ export function manuscriptStats(body: HTMLTextAreaElement) {
   }
   return {
     字数: characterCount(text),
-    选区: characterCount(text.slice(body.selectionStart, body.selectionEnd)),
+    选区: characterCount(text.slice(from, to)),
     行数: lines,
     段落: paragraphs,
   };

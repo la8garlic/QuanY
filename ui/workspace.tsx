@@ -141,13 +141,7 @@ function WritingDesk({
           </div>
           <input id="title" aria-label={t("手稿标题")} placeholder={t("未命名手稿")} autoComplete="off" disabled />
 
-          <textarea
-            id="body"
-            aria-label={t("正文")}
-            placeholder={t("在这里写下正文…")}
-            spellCheck={false}
-            disabled
-          ></textarea>
+          <div id="body"></div>
         </article>
         <section id="reference" hidden aria-label={t("只读参考稿")}>
           <header>

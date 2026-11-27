@@ -3,6 +3,7 @@ import { locale, t, type Message } from "./i18n";
 import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Entry } from "./ipc";
+import { writing } from "./writing";
 import { manuscriptStats } from "./statistics";
 
 export function DetailsDialog({
@@ -20,7 +21,7 @@ export function DetailsDialog({
   const [target, setTarget] = useState(entry.goal ? String(entry.goal) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [stats] = useState(() => manuscriptStats(document.querySelector<HTMLTextAreaElement>("#body")!));
+  const [stats] = useState(() => manuscriptStats(writing.state.doc.toString(), writing.state.selection.main.from, writing.state.selection.main.to));
   const parsed = [
     ...new Set(
       names
@@ -156,7 +157,7 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
       ref={ref}
       onClose={(e) => {
         if (e.currentTarget.returnValue === "opened")
-          document.querySelector<HTMLTextAreaElement>("#body")!.focus();
+          writing.focus();
         close();
       }}
       aria-label={t("快速切稿")}

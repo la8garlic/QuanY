@@ -1,6 +1,7 @@
 import { locale, onLanguageChange } from "./i18n";
 /** 直接查找纯文本偏移量，替换通过编辑控件完成，可使用 Ctrl+Z 撤销。 */
-import { body, el } from "./view.js";
+import { writing, selectText, onTextChange } from "./writing";
+import { el } from "./view.js";
 
 const bar = el("findbar"), needle = el<HTMLInputElement>("needle");
 const replacement = el<HTMLInputElement>("replacement");
@@ -17,7 +18,7 @@ function recount() {
   anchors = [];
   count = 0;
   last = -1;
-  const query = needle.value, text = body.value;
+  const query = needle.value, text = writing.state.doc.toString();
   if (query) {
     let pos = text.indexOf(query);
     let nextAnchor = 0;
@@ -40,7 +41,7 @@ function schedule() {
 }
 
 function nearest(edge: number, back: boolean) {
-  const text = body.value, query = needle.value;
+  const text = writing.state.doc.toString(), query = needle.value;
   let low = 0, high = anchors.length;
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
@@ -57,26 +58,27 @@ function nearest(edge: number, back: boolean) {
 function move(back: boolean) {
   if (timer !== undefined) recount();
   if (!count) return;
-  const at = nearest(back ? body.selectionStart : body.selectionEnd, back);
-  body.focus();
-  body.setSelectionRange(at, at + needle.value.length);
+  const at = nearest(back ? writing.state.selection.main.from : writing.state.selection.main.to, back);
+  writing.focus();
+  selectText(at, at + needle.value.length);
 }
 
 function replace(all: boolean) {
   if (timer !== undefined) recount();
-  if (body.readOnly || !count) return;
-  if (!all && (body.selectionEnd-body.selectionStart !== needle.value.length || nearest(body.selectionStart, false) !== body.selectionStart)) move(false);
-  const value = all ? body.value.split(needle.value).join(replacement.value) : replacement.value;
-  body.focus();
-  if (all) body.select();
-  if (value) document.execCommand("insertText",false,value);
-  else document.execCommand("delete");
+  if (writing.state.readOnly || !count) return;
+  if (!all && (writing.state.selection.main.to-writing.state.selection.main.from !== needle.value.length || nearest(writing.state.selection.main.from, false) !== writing.state.selection.main.from)) move(false);
+  const {doc, selection} = writing.state;
+  const {from, to} = selection.main;
+  const insert = all ? doc.toString().split(needle.value).join(replacement.value) : replacement.value;
+  writing.focus();
+  writing.dispatch({changes: {from: all ? 0 : from, to: all ? doc.length : to, insert},
+    selection: {anchor: (all ? 0 : from) + insert.length}, userEvent: "input.replace"});
   if (!all) move(false);
 }
 
 export function resetFind() { clearTimeout(timer); timer = undefined; bar.hidden = true; anchors = []; }
 export function openFind(forReplace: boolean) {
-  const selected = body.value.slice(body.selectionStart, body.selectionEnd);
+  const selected = writing.state.sliceDoc(writing.state.selection.main.from, writing.state.selection.main.to);
   if (selected && !selected.includes("\n")) needle.value = selected;
   bar.hidden = false;
   recount();
@@ -86,14 +88,14 @@ export function openFind(forReplace: boolean) {
 }
 export function initFind() {
   el("find-open").onclick = () => openFind(false);
-  el("find-close").onclick = () => { resetFind(); body.focus(); };
+  el("find-close").onclick = () => { resetFind(); writing.focus(); };
   el("next").onclick = () => move(false);
   el("prev").onclick = () => move(true);
   el("replace-one").onclick = () => replace(false);
   el("replace-all").onclick = () => replace(true);
   onLanguageChange(() => { if (!bar.hidden) recount(); });
   needle.oninput = schedule;
-  body.addEventListener("input", () => { if (!bar.hidden) schedule(); });
+  onTextChange( () => { if (!bar.hidden) schedule(); });
   document.addEventListener("keydown", e => {
     if (bar.hidden || e.isComposing || document.querySelector("dialog[open]")) return;
     if (e.key === "Escape") { e.stopImmediatePropagation(); el("find-close").click(); }
