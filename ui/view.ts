@@ -31,7 +31,7 @@ export function setDirectory(value: string) {
   directory = value;
   el<HTMLInputElement>("folder").value = value;
 }
-export const saveDelay = () => Number(el<HTMLSelectElement>("delay").value);
+export const saveDelay = () => Number(document.querySelector<HTMLInputElement>('input[name="delay"]:checked')!.value);
 
 export function settings(onDirectory: (value: string) => void) {
   const root = document.documentElement;
@@ -41,25 +41,29 @@ export function settings(onDirectory: (value: string) => void) {
   el("options").onclick = () => {
     input.value = directory;
     hint.textContent = note;
+    syncApply();
     panel.showModal();
   };
+  const applyFolder = el<HTMLButtonElement>("apply-folder");
+  const browse = el<HTMLButtonElement>("browse");
+  function syncApply() {
+    applyFolder.disabled = !input.value.trim() || input.value.trim() === directory;
+  }
+  input.oninput = syncApply;
   async function updateFolder(pick: boolean) {
-    const buttons = [el<HTMLButtonElement>("browse"), el<HTMLButtonElement>("apply-folder")];
-    buttons.forEach(b => b.disabled = true);
+    input.readOnly = browse.disabled = applyFolder.disabled = true;
     try {
       const value = await (pick ? library.chooseFolder() : library.setFolder(input.value.trim()));
       if (value !== null) { setDirectory(value); onDirectory(value); hint.textContent = "目录已保存，新稿将在此创建 TXT。"; }
     } catch (error) { hint.textContent = String(error); }
-    finally { buttons.forEach(b => b.disabled = false); }
+    finally { input.readOnly = browse.disabled = false; syncApply(); }
   }
-  el("browse").onclick = () => updateFolder(true);
-  el("apply-folder").onclick = () => updateFolder(false);
-  input.onkeydown = e => { if (e.key === "Enter") el("apply-folder").click(); };
-  const controls = ["font","delay"].map(id=>el<HTMLSelectElement>(id));
-  for (const control of controls) {
-    const value = localStorage.getItem(control.id);
-    if (Array.from(control.options).some(o => o.value === value)) control.value = value!;
-  }
+  browse.onclick = () => updateFolder(true);
+  applyFolder.onclick = () => updateFolder(false);
+  input.onkeydown = e => { if (e.key === "Enter") applyFolder.click(); };
+  const font = el<HTMLSelectElement>("font");
+  const savedFont = localStorage.getItem("font");
+  if (savedFont !== null && Array.from(font.options).some(o => o.value === savedFont)) font.value = savedFont;
   // 保留已保存的偏好键，原生单选框负责方向键导航。
   const choices = Array.from(panel.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
   for (const choice of choices) {
@@ -70,7 +74,7 @@ export function settings(onDirectory: (value: string) => void) {
   let size = Number(localStorage.getItem("size") ?? "20");
   if (!Number.isInteger(size) || size < 12 || size > 36) size = 20;
   function apply() {
-    for (const control of controls) root.dataset[control.id] = control.value;
+    root.dataset.font = font.value;
     for (const choice of choices) {
       if (choice.checked) {
         root.dataset[choice.name] = choice.value;
@@ -85,14 +89,14 @@ export function settings(onDirectory: (value: string) => void) {
   }
   function remember() {
     apply();
-    for (const control of controls) localStorage.setItem(control.id,control.value);
+    localStorage.setItem("font", font.value);
     for (const choice of choices) if (choice.checked) localStorage.setItem(choice.name, choice.value);
     localStorage.setItem("wrap",wrap.checked ? "soft" : "off");
     localStorage.setItem("size",String(size));
   }
   el("smaller").onclick = () => { size -= 2; remember(); };
   el("larger").onclick = () => { size += 2; remember(); };
-  for (const control of [...controls, ...choices, wrap]) control.onchange = remember;
+  for (const control of [font, ...choices, wrap]) control.onchange = remember;
   el("focus").onclick = () => setFocusMode(!document.body.classList.contains("focused"));
   apply();
 }

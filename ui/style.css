@@ -1123,39 +1123,86 @@ dialog header button.control-close:hover,
   .segments label:has(:checked), .paper-choices label:has(:checked) { outline: 2px solid Highlight; outline-offset: -2px; }
 }
 
+.preference-block h3, .save-location > label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.preference-block + .preference-block {
+  margin-top: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.preference-block .setting, #bindings .setting {
+  min-height: 39px;
+  font-size: 13px;
+}
+.preference-block label.setting { cursor: pointer; }
 .keycap {
-  min-width: 96px;
-  gap: 4px;
-  padding: 4px 6px;
-  background: transparent;
-  color: var(--muted);
-  font:
-    11px/1.35 "Segoe UI",
-    sans-serif;
-}
-.keycap:hover {
+  min-width: 102px;
+  padding: 3px 8px;
   background: var(--control-tray);
+  color: var(--muted);
+  font-size: 11px;
 }
+.keycap:hover { background: var(--side-hover); color: var(--ink); }
 .keycap kbd {
-  display: grid;
-  place-items: center;
-  min-width: 23px;
-  height: 23px;
-  padding: 0 5px;
-  border: 1px solid var(--control-border);
-  border-bottom-width: 2px;
-  border-radius: 5px;
+  min-width: 19px;
+  padding: 1px 4px;
+  border-radius: 4px;
   background: var(--control);
   color: var(--ink);
-  font:
-    12px "Segoe UI",
-    sans-serif;
+  font: 12px/18px "Segoe UI", sans-serif;
+  text-align: center;
 }
 .keycap[data-listening="true"] {
+  color: var(--accent);
+  background: var(--selected);
+  border-color: var(--accent);
+}
+#standby-info, #folder-info {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.save-location { margin-bottom: 20px; }
+.path-field {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 3px 3px 10px;
+  gap: 6px;
+  border-radius: 8px;
+  background: var(--control-tray);
+}
+.path-field > svg { color: var(--muted); }
+.path-field input, .path-field input:focus-visible {
+  min-height: 30px;
+  padding: 2px 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
+}
+.path-field:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.folder-row button { flex: none; padding-inline: 10px; }
+.folder-row #browse {
+  border-color: transparent;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.folder-row #apply-folder {
   background: var(--selected);
   color: var(--accent);
-  border: 1px dashed var(--accent);
+  border-color: transparent;
+  box-shadow: none;
 }
+.folder-row #browse:hover, .folder-row #apply-folder:hover:enabled { background: var(--active); }
+.folder-row #apply-folder:disabled { color: var(--muted); background: var(--control-tray); }
+.folder-row svg, #reset-keys svg, #key-list summary svg { width: 15px; height: 15px; }
 input[role="switch"] {
   appearance: none;
   position: relative;
@@ -1218,12 +1265,40 @@ input[role="switch"]:disabled {
   height: 14px;
 }
 
-#key-list {
-  margin-top: 12px;
-}
+/* 原生 details 保留键盘展开行为，箭头随展开状态旋转。 */
+#key-list { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px; }
 #key-list summary {
-  color: var(--accent);
-  padding-left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  list-style: none;
+}
+#key-list summary::-webkit-details-marker { display: none; }
+#key-list summary svg { color: var(--muted); }
+#key-list summary svg:last-child { margin-left: auto; }
+#key-list[open] summary svg:last-child { transform: rotate(180deg); }
+#key-list summary:hover { background: var(--control-tray); }
+#reset-keys {
+  margin-top: 8px;
+  border-color: transparent;
+  color: var(--muted);
+  background: var(--control-tray);
+  box-shadow: none;
+  font-size: 12px;
+}
+#reset-keys:hover { color: var(--ink); background: var(--side-hover); }
+@media (forced-colors: none) {
+  .preference-block input[role="switch"]:not(:checked) {
+    background: var(--control-tray);
+    border-color: var(--switch-off);
+  }
+  .preference-block input[role="switch"]:not(:checked)::before { background: var(--muted); box-shadow: none; }
+}
+@media (max-width: 400px) {
+  .path-field > svg, #browse svg, #apply-folder svg { display: none; }
 }
 #reference {
   margin: 18px 0;
