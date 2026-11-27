@@ -1,3 +1,4 @@
+import { literalSearch } from "./search";
 import { locale, t, type Message } from "./i18n";
 import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -128,9 +129,9 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
   const [query, setQuery] = useState(""),
     [selected, setSelected] = useState(0);
   const term = query.trim(),
-    normalized = term.toLocaleLowerCase();
+    pattern = literalSearch(term);
   const matches = entries
-    .filter((n) => (n.title || t("未命名手稿")).toLocaleLowerCase().includes(normalized))
+    .filter((n) => pattern.test(n.title || t("未命名手稿")))
     .slice(0, 15);
   const create = term !== "" && !entries.some((n) => n.title === term);
   const length = matches.length + Number(create);

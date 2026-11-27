@@ -2912,6 +2912,7 @@ dependencies = [
 name = "quany"
 version = "1.7.2"
 dependencies = [
+ "regex",
  "rfd",
  "rusqlite",
  "serde",

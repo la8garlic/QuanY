@@ -1,5 +1,6 @@
 import { locale, onLanguageChange, t } from "./i18n";
 import { initResearch } from "./research.js";
+import { literalSearch } from "./search";
 import { initKeys, localAction } from "./shortcuts.js";
 import { desktop, standby, library, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
@@ -224,8 +225,10 @@ export function openManuscript(id: number, term = "") {
   return action(async () => {
     if (id !== current) open(await library.select(id));
     body.focus();
-    const at = body.value.toLowerCase().indexOf(term.toLowerCase());
-    if (term && at >= 0) body.setSelectionRange(at, at + term.length);
+    if (term) {
+      const match = literalSearch(term).exec(body.value);
+      if (match) body.setSelectionRange(match.index, match.index + match[0].length);
+    }
   });
 }
 

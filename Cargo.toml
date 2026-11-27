@@ -19,6 +19,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 rfd = { version = "0.18", default-features = false }
 tempfile = "3"
+regex = { version = "1", default-features = false, features = ["std", "perf", "unicode-case"] }
 
 [profile.release]
 opt-level = "s"
