@@ -74,6 +74,35 @@ fn launch_command() -> io::Result<String> {
     Ok(args.join(" "))
 }
 
+/// 正式版接管同目录旧程序的启动命令，独立稿本和用户自定义命令不参与升级。
+fn upgrade_startup_command() -> io::Result<()> {
+    let exe = env::current_exe()?;
+    if env::args_os().any(|arg| arg == "--workspace")
+        || !exe
+            .file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("QuanY.exe"))
+    {
+        return Ok(());
+    }
+    let run = match RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(RUN, KEY_READ) {
+        Ok(run) => run,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    let previous = format!(
+        "\"{}\" --background",
+        exe.with_file_name("笺记.exe").display()
+    );
+    match run.get_value::<String, _>(VALUE) {
+        Ok(command) if command == previous => RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey_with_flags(RUN, KEY_SET_VALUE)?
+            .set_value(VALUE, &launch_command()?),
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 fn startup_enabled() -> io::Result<bool> {
     let run = RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(RUN, KEY_READ);
     let value = run.and_then(|key| key.get_value::<String, _>(VALUE));
@@ -84,7 +113,7 @@ fn startup_enabled() -> io::Result<bool> {
     }
 }
 
-/// 设置当前用户登录后的后台启动项，仅管理笺记自己的注册表值。
+/// 设置当前用户登录后的后台启动项，仅管理泉涌自己的注册表值。
 #[tauri::command]
 pub fn set_autostart(enabled: bool) -> std::result::Result<bool, String> {
     (|| -> io::Result<bool> {
@@ -184,7 +213,7 @@ pub fn signal(app: &AppHandle, action: &str) {
             .and_then(|()| w.emit("standby-action", action));
         if let Err(e) = result {
             rfd::MessageDialog::new()
-                .set_title("笺记")
+                .set_title("泉涌")
                 .set_description(e.to_string())
                 .show();
         }
@@ -192,6 +221,7 @@ pub fn signal(app: &AppHandle, action: &str) {
 }
 
 pub fn install(app: &tauri::App) -> Result<()> {
+    upgrade_startup_command()?;
     let library = app.state::<Library>();
     let db = library.db.lock().expect("稿本锁损坏");
     db.execute_batch("CREATE TABLE IF NOT EXISTS standby(slot INTEGER PRIMARY KEY CHECK(slot=1),hotkey TEXT NOT NULL);
@@ -221,9 +251,9 @@ pub fn install(app: &tauri::App) -> Result<()> {
     let full = MenuItem::with_id(app, "full", "打开主窗口", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "保存并退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quick, &full, &quit])?;
-    TrayIconBuilder::with_id("jianji")
-        .icon(app.default_window_icon().ok_or("缺少笺记图标")?.clone())
-        .tooltip("笺记 · 单击速记，右击菜单")
+    TrayIconBuilder::with_id("quany")
+        .icon(app.default_window_icon().ok_or("缺少泉涌图标")?.clone())
+        .tooltip("泉涌 · 单击速记，右击菜单")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| signal(app, e.id.as_ref()))
@@ -285,8 +315,11 @@ pub async fn display_editor(
                 area.position.y + (area.size.height as i32 - outer.height as i32 - pad).max(0),
             ))?;
             window.set_always_on_top(true)?;
-            window.set_title("笺记 · 速记")?;
+            window.set_title("泉涌 · 速记")?;
         } else if let Some(g) = full.as_ref() {
+            if window.is_maximized()? {
+                window.unmaximize()?;
+            }
             window.set_always_on_top(false)?;
             window.set_min_size(Some(LogicalSize::new(540, 420)))?;
             window.set_size(g.size)?;
@@ -294,7 +327,7 @@ pub async fn display_editor(
             if g.maximized {
                 window.maximize()?;
             }
-            window.set_title("笺记")?;
+            window.set_title("泉涌")?;
             *full = None;
         }
         window.show()?;

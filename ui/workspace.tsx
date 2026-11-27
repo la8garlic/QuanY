@@ -1,3 +1,4 @@
+import { WindowControls } from "./window-controls";
 import {
   ArchiveX,
   BookOpen,
@@ -31,7 +32,7 @@ function WritingDesk({
 }) {
   return (
     <main>
-      <header className="bar">
+      <header className="bar" data-tauri-drag-region>
         <button id="quick-new">
           <FilePenLine aria-hidden="true" />
           新便笺
@@ -69,7 +70,7 @@ function WritingDesk({
           <BookOpen aria-hidden="true" />
           快速切稿
         </button>
-        <span className="spacer"></span>
+        <span className="spacer" data-tauri-drag-region />
         <div className="tool-group" role="group" aria-label="查阅工具">
           <button className="icon-tool" id="find-open" aria-label="查找">
             <Search aria-hidden="true" />
@@ -96,6 +97,7 @@ function WritingDesk({
           <span id="quick-label">速记窗</span>
         </button>
         <button id="stow">收起</button>
+        <WindowControls />
       </header>
       <section id="findbar" aria-label="正文查找与替换" hidden>
         <div>

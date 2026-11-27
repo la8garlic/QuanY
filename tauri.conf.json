@@ -1,13 +1,14 @@
 {
-  "productName": "笺记",
-  "version": "1.5.1",
+  "productName": "泉涌",
+  "version": "1.6.0",
   "identifier": "cn.jianji.writer",
   "build": { "frontendDist": "dist", "beforeBuildCommand": "npm run build" },
   "app": {
     "withGlobalTauri": true,
     "windows": [{
-      "title": "笺记",
+      "title": "泉涌",
       "visible": false,
+      "decorations": false,
       "width": 1040,
       "height": 740,
       "minWidth": 540,
@@ -20,7 +21,9 @@
       "capabilities": [{
         "identifier": "editor",
         "windows": ["main","memo-*"],
-        "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy","core:window:allow-hide"]
+        "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy","core:window:allow-hide",
+          "core:window:allow-close", "core:window:allow-minimize", "core:window:allow-is-maximized",
+          "core:window:allow-toggle-maximize", "core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize"]
       }]
     }
   },

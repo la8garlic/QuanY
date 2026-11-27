@@ -1,8 +1,8 @@
 [package]
-name = "jianji"
-version = "1.5.1"
+name = "quany"
+version = "1.6.0"
 edition = "2021"
-description = "笺记 · 本地写作记事本"
+description = "泉涌（QuanY）· 本地写作记事本"
 build = "build.rs"
 
 [build-dependencies]

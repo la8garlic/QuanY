@@ -162,15 +162,7 @@ aside {
 .brand-stamp {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  color: #fff9ee;
-  background: var(--stamp);
-  box-shadow: inset 0 0 0 1px #0001;
-}
-.brand-stamp i {
-  font-size: 18px;
+  pointer-events: none;
 }
 #new {
   margin-left: auto;
@@ -1237,7 +1229,7 @@ body.quick #reference {
 body.quick :is(#quick-new, #stow) {
   display: inline-flex;
 }
-body.quick .bar > :not(#quick-new, #quick-toggle, #stow, .spacer) {
+body.quick .bar > :not(#quick-new, #quick-toggle, #stow, .spacer, .window-controls) {
   display: none;
 }
 body.quick .bar {
@@ -1354,4 +1346,47 @@ body.memo-window {
   .settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 空白处交给系统拖动，标题栏中的按钮保留自己的点击与键盘行为。 */
+[data-tauri-drag-region] { user-select: none; }
+.bar { padding-right: 0; }
+.bar .spacer { align-self: stretch; min-width: 20px; }
+.window-controls {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  margin-left: 8px;
+  color: inherit;
+}
+.window-controls button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border-radius: 0;
+}
+.window-controls svg.lucide { width: 14px; height: 14px; stroke-width: 1.6; }
+.window-controls button:hover { background: var(--side-hover); }
+.window-controls .window-close:hover { color: white; background: #bf3d36; }
+.window-controls button:focus-visible { outline-offset: -3px; }
+.memo-window header { gap: 4px; }
+.memo-window #memo-status { flex: 1; text-align: right; }
+.memo-window .window-controls { margin: -8px -12px 0 2px; }
+.memo-window .window-controls button, .quick .window-controls button { width: 27px; }
+body.quick .bar { flex-wrap: nowrap; padding-right: 0; }
+body.quick .bar .spacer { flex: 1; min-width: 12px; }
+@media (max-width: 760px) {
+  .bar .window-controls { margin-left: auto; }
+  .bar .window-controls button { width: 29px; }
+}
+main { container-type: inline-size; }
+@container (max-width: 570px) {
+  body:not(.quick) .bar { position: relative; height: auto; min-height: 70px; flex-wrap: wrap; padding-top: 32px; }
+  body:not(.quick) .bar .window-controls { position: absolute; top: 0; right: 0; }
+}
+@media (max-width: 320px) {
+  .quick #quick-new svg, .quick #quick-toggle svg { display: none; }
+  .memo-window header { flex-wrap: wrap; }
 }

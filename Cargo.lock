@@ -1881,21 +1881,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jianji"
-version = "1.5.1"
-dependencies = [
- "rfd",
- "rusqlite",
- "serde",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-single-instance",
- "tempfile",
- "winreg",
-]
-
-[[package]]
 name = "jiff"
 version = "0.2.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2921,6 +2906,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quany"
+version = "1.6.0"
+dependencies = [
+ "rfd",
+ "rusqlite",
+ "serde",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-single-instance",
+ "tempfile",
+ "winreg",
 ]
 
 [[package]]

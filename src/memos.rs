@@ -60,7 +60,8 @@ pub async fn open_memo(
             .map_err(|e| e.to_string());
     }
     let w = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("memo.html".into()))
-        .title("笺记 · 独立便笺")
+        .title("泉涌 · 独立便笺")
+        .decorations(false)
         .inner_size(320., 240.)
         .min_inner_size(240., 165.)
         .always_on_top(true)

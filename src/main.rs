@@ -19,13 +19,13 @@ fn workspace(app: &tauri::App) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     match args.as_slice() {
         [] => Ok((
             app.path().app_local_data_dir()?,
-            app.path().document_dir()?.join("笺记"),
+            app.path().document_dir()?.join("泉涌"),
         )),
         [flag, path] if flag == "--workspace" => {
             let dir = std::path::absolute(path)?;
             Ok((dir.clone(), dir.join("文本")))
         }
-        _ => Err("用法：jianji.exe [--workspace 稿件目录]".into()),
+        _ => Err("用法：QuanY.exe [--workspace 稿件目录]".into()),
     }
 }
 
@@ -98,7 +98,7 @@ fn main() {
 
 fn startup_error(error: &dyn Error) -> ! {
     rfd::MessageDialog::new()
-        .set_title("笺记无法启动")
+        .set_title("泉涌无法启动")
         .set_description(error.to_string())
         .set_level(rfd::MessageLevel::Error)
         .show();

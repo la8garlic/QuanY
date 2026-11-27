@@ -12,6 +12,10 @@ export interface Saved { entry: Entry; path: string }
 
 interface DesktopWindow {
   onCloseRequested(handler: (event: { preventDefault(): void }) => Promise<void>): Promise<() => void>;
+  minimize(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  close(): Promise<void>;
   destroy(): Promise<void>;
   hide(): Promise<void>;
   listen<T>(name:string,handler:(event:{payload:T})=>void):Promise<()=>void>;

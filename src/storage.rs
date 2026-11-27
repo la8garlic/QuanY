@@ -70,7 +70,7 @@ impl Library {
         match writer.try_lock() {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
-                return Err("这个稿本已经在另一个笺记窗口中打开。".into())
+                return Err("这个稿本已经在另一个泉涌窗口中打开。".into())
             }
             Err(std::fs::TryLockError::Error(err)) => return Err(err.into()),
         }
