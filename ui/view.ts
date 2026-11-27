@@ -6,7 +6,7 @@ export const search = el<HTMLInputElement>("search");
 export const untitled = "未命名手稿";
 const date = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" });
 const clock = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-import type { Entry } from "./ipc.js";
+import { library, type Entry } from "./ipc.js";
 
 export function list(entries: Entry[], current: number) {
   const fragment = document.createDocumentFragment();
@@ -54,42 +54,62 @@ export function setFocusMode(on: boolean) {
   body.focus();
 }
 
-export function settings() {
+let directory = "";
+export function setDirectory(value: string) {
+  directory = value;
+  el<HTMLInputElement>("folder").value = value;
+}
+export const saveDelay = () => Number(el<HTMLSelectElement>("delay").value);
+
+export function settings(onDirectory: (value: string) => void) {
   const root = document.documentElement;
-  const font = el<HTMLSelectElement>("font"), theme = el<HTMLSelectElement>("theme");
-  const panel = el("panel"), options = el("options");
-  function menu(open: boolean) {
-    panel.hidden = !open;
-    options.setAttribute("aria-expanded", String(open));
+  const panel = el<HTMLDialogElement>("panel");
+  const input = el<HTMLInputElement>("folder"), hint = el("folder-info");
+  const note = hint.textContent;
+  el("options").onclick = () => {
+    input.value = directory;
+    hint.textContent = note;
+    panel.showModal();
+  };
+  async function updateFolder(pick: boolean) {
+    const buttons = [el<HTMLButtonElement>("browse"), el<HTMLButtonElement>("apply-folder")];
+    buttons.forEach(b => b.disabled = true);
+    try {
+      const value = await (pick ? library.chooseFolder() : library.setFolder(input.value.trim()));
+      if (value !== null) { setDirectory(value); onDirectory(value); hint.textContent = "目录已保存，新稿将在此创建 TXT。"; }
+    } catch (error) { hint.textContent = String(error); }
+    finally { buttons.forEach(b => b.disabled = false); }
   }
-  options.onclick = () => menu(panel.hidden);
-  document.addEventListener("pointerdown", e => {
-    if (e.target instanceof Node && !panel.contains(e.target) && !options.contains(e.target)) menu(false);
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && !panel.hidden) { menu(false); options.focus(); }
-  });
+  el("browse").onclick = () => updateFolder(true);
+  el("apply-folder").onclick = () => updateFolder(false);
+  input.onkeydown = e => { if (e.key === "Enter") el("apply-folder").click(); };
+  const controls = ["font","theme","delay","leading","width"].map(id=>el<HTMLSelectElement>(id));
+  for (const control of controls) {
+    const value = localStorage.getItem(control.id);
+    if (Array.from(control.options).some(o => o.value === value)) control.value = value!;
+  }
+  const wrap = el<HTMLInputElement>("wrap");
+  wrap.checked = localStorage.getItem("wrap") !== "off";
   let size = Number(localStorage.getItem("size") ?? "20");
-  if (!Number.isInteger(size) || size < 16 || size > 32) size = 20;
-  font.value = localStorage.getItem("font") === "sans" ? "sans" : "serif";
-  theme.value = localStorage.getItem("theme") === "night" ? "night" : "paper";
+  if (!Number.isInteger(size) || size < 12 || size > 36) size = 20;
   function apply() {
-    root.dataset.font = font.value;
-    root.dataset.theme = theme.value;
+    for (const control of controls) root.dataset[control.id] = control.value;
+    root.style.setProperty("--leading", el<HTMLSelectElement>("leading").value);
     root.style.setProperty("--text-size", size + "px");
+    body.wrap = wrap.checked ? "soft" : "off";
     el("size").textContent = String(size);
-    el<HTMLButtonElement>("smaller").disabled = size <= 16;
-    el<HTMLButtonElement>("larger").disabled = size >= 32;
+    el<HTMLButtonElement>("smaller").disabled = size <= 12;
+    el<HTMLButtonElement>("larger").disabled = size >= 36;
   }
   function remember() {
     apply();
-    localStorage.setItem("size", String(size));
-    localStorage.setItem("font", font.value);
-    localStorage.setItem("theme", theme.value);
+    for (const control of controls) localStorage.setItem(control.id,control.value);
+    localStorage.setItem("wrap",wrap.checked ? "soft" : "off");
+    localStorage.setItem("size",String(size));
   }
   el("smaller").onclick = () => { size -= 2; remember(); };
   el("larger").onclick = () => { size += 2; remember(); };
-  font.onchange = theme.onchange = remember;
+  for (const control of [...controls, wrap]) control.onchange = remember;
   el("focus").onclick = () => setFocusMode(!document.body.classList.contains("focused"));
   apply();
 }

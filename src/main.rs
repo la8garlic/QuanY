@@ -1,16 +1,24 @@
 #![windows_subsystem = "windows"]
 
 mod commands;
+mod files;
 mod storage;
+mod text;
 
 use std::{env, error::Error, path::PathBuf};
 use tauri::Manager;
 
-fn workspace(app: &tauri::App) -> Result<PathBuf, Box<dyn Error>> {
+fn workspace(app: &tauri::App) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     match args.as_slice() {
-        [] => Ok(app.path().app_local_data_dir()?),
-        [flag, path] if flag == "--workspace" => Ok(PathBuf::from(path)),
+        [] => Ok((
+            app.path().app_local_data_dir()?,
+            app.path().document_dir()?.join("笺记"),
+        )),
+        [flag, path] if flag == "--workspace" => {
+            let dir = std::path::absolute(path)?;
+            Ok((dir.clone(), dir.join("文本")))
+        }
         _ => Err("用法：jianji.exe [--workspace 稿件目录]".into()),
     }
 }
@@ -18,7 +26,8 @@ fn workspace(app: &tauri::App) -> Result<PathBuf, Box<dyn Error>> {
 fn main() {
     let result = tauri::Builder::default()
         .setup(|app| {
-            let library = workspace(app).and_then(|dir| storage::Library::open(&dir));
+            let library =
+                workspace(app).and_then(|(dir, texts)| storage::Library::open(&dir, &texts));
             match library {
                 Ok(library) => {
                     app.manage(library);
@@ -34,7 +43,11 @@ fn main() {
             commands::save_note,
             commands::bookmark,
             commands::delete_note,
-            commands::export_text
+            commands::save_as,
+            commands::open_text,
+            commands::choose_folder,
+            commands::set_folder,
+            commands::open_location
         ])
         .build(tauri::generate_context!());
     match result {

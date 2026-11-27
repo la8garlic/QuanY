@@ -24,11 +24,14 @@ pub struct Entry {
 
 #[derive(Serialize)]
 pub struct Note {
-    id: i64,
+    pub id: i64,
     title: String,
     body: String,
     modified: i64,
     place: Place,
+    path: Option<String>,
+    pending: bool,
+    pub notice: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,11 +44,12 @@ pub struct Place {
 #[derive(Serialize)]
 pub struct Desk {
     entries: Vec<Entry>,
-    note: Note,
+    pub note: Note,
+    folder: String,
 }
 
 impl Library {
-    pub fn open(dir: &Path) -> Result<Self, Box<dyn Error>> {
+    pub fn open(dir: &Path, texts: &Path) -> Result<Self, Box<dyn Error>> {
         fs::create_dir_all(dir)?;
         let writer = File::options()
             .create(true)
@@ -73,11 +77,21 @@ impl Library {
                  note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
                  start INTEGER NOT NULL, end INTEGER NOT NULL, top REAL NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS links (
+                 note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+                 path TEXT NOT NULL UNIQUE COLLATE NOCASE, baseline BLOB NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS outbox (note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE);
+             CREATE TABLE IF NOT EXISTS save_options (slot INTEGER PRIMARY KEY CHECK(slot=1), folder TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS desk (
                  slot INTEGER PRIMARY KEY CHECK(slot=1), note INTEGER NOT NULL REFERENCES notes(id)
              );",
         )?;
         let tx = db.transaction()?;
+        tx.execute(
+            "INSERT OR IGNORE INTO save_options VALUES(1,?1)",
+            [texts.to_string_lossy().as_ref()],
+        )?;
         if tx.query_row("SELECT count(*) FROM desk", [], |r| r.get::<_, i64>(0))? == 0 {
             let id = insert(&tx, "", "")?;
             tx.execute("INSERT INTO desk VALUES(1, ?1)", [id])?;
@@ -91,13 +105,15 @@ impl Library {
 }
 
 fn read_note(db: &Connection, id: i64) -> rusqlite::Result<Note> {
-    db.query_row("SELECT n.id,n.title,n.body,n.modified,coalesce(p.start,0),coalesce(p.end,0),coalesce(p.top,0)
-                  FROM notes n LEFT JOIN places p ON p.note=n.id WHERE n.id=?1", [id], |r| Ok(Note {
+    db.query_row("SELECT n.id,n.title,n.body,n.modified,coalesce(p.start,0),coalesce(p.end,0),coalesce(p.top,0),
+                         l.path, EXISTS(SELECT 1 FROM outbox WHERE note=n.id)
+                  FROM notes n LEFT JOIN places p ON p.note=n.id LEFT JOIN links l ON l.note=n.id WHERE n.id=?1", [id], |r| Ok(Note {
         id: r.get(0)?,
         title: r.get(1)?,
         body: r.get(2)?,
         modified: r.get(3)?,
         place: Place { start: r.get(4)?, end: r.get(5)?, top: r.get(6)? },
+        path: r.get(7)?, pending: r.get(8)?, notice: None,
     }))
 }
 
@@ -110,7 +126,11 @@ pub fn desk(db: &Connection) -> rusqlite::Result<Desk> {
     let entries = query
         .query_map([], entry)?
         .collect::<rusqlite::Result<_>>()?;
-    Ok(Desk { entries, note })
+    Ok(Desk {
+        entries,
+        note,
+        folder: crate::files::folder(db)?,
+    })
 }
 
 fn entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
@@ -130,7 +150,17 @@ fn label(title: &str, body: &str) -> String {
     text.chars().take_while(|c| *c != '\n').take(80).collect()
 }
 
-fn insert(db: &Connection, title: &str, body: &str) -> rusqlite::Result<i64> {
+pub fn reload_body(db: &Connection, id: i64, body: &str) -> rusqlite::Result<()> {
+    let title: String = db.query_row("SELECT title FROM notes WHERE id=?1", [id], |r| r.get(0))?;
+    db.execute(
+        "UPDATE notes SET body=?2,label=?3,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
+        WHERE id=?1 AND body<>?2",
+        params![id, body, label(&title, body)],
+    )?;
+    Ok(())
+}
+
+pub fn insert(db: &Connection, title: &str, body: &str) -> rusqlite::Result<i64> {
     db.execute(
         "INSERT INTO notes(title,body,label) VALUES(?1,?2,?3)",
         params![title, body, label(title, body)],
@@ -175,6 +205,8 @@ pub fn save(
         entry,
     )?;
     bookmark(&tx, id, place)?;
+    // 原文件可能位于离线盘；先提交恢复稿，成功写出 TXT 后才清除此标记。
+    tx.execute("INSERT OR IGNORE INTO outbox VALUES(?1)", [id])?;
     tx.commit()?;
     Ok(result)
 }

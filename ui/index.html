@@ -13,34 +13,53 @@
     <input id="search" type="search" placeholder="搜索标题" aria-label="搜索标题">
     <div class="list-heading"><h2>我的稿本</h2><span id="total">0</span></div>
     <nav id="notes" aria-label="手稿列表"></nav>
-    <button id="import" class="import">导入文本…</button>
-    <input id="file" type="file" accept=".txt,text/plain" hidden>
+    <button id="remove" class="import">从稿本移除当前手稿…</button>
   </aside>
   <main>
     <header class="bar">
-      <button id="focus" aria-pressed="false" title="专注模式（F8）">专注</button>
+      <button id="open-file" title="打开 TXT（Ctrl+O）">打开</button>
+      <button id="save-file" title="保存（Ctrl+S）">保存</button>
+      <button id="save-as" title="另存为（Ctrl+Shift+S）">另存为</button>
       <span class="spacer"></span>
-      <button id="export" title="导出 UTF-8 纯文本（Ctrl+Shift+S）">导出文本</button>
-      <button id="options" class="dots" aria-label="写作设置" aria-haspopup="true" aria-expanded="false">•••</button>
-      <section id="panel" aria-label="写作设置" hidden>
-        <div class="setting"><span>正文字号</span><button id="smaller" aria-label="减小字号">−</button><output id="size"></output><button id="larger" aria-label="增大字号">＋</button></div>
-        <label class="setting">正文字体<select id="font"><option value="serif">宋体</option><option value="sans">黑体</option></select></label>
-        <label class="setting">纸张<select id="theme"><option value="paper">米白</option><option value="night">夜色</option></select></label>
-        <button id="remove" class="danger">删除当前手稿…</button>
-      </section>
+      <button id="find-open" title="查找与替换（Ctrl+F / Ctrl+H）">查找</button>
+      <button id="focus" aria-pressed="false" title="专注模式（F8）">专注</button>
+      <button id="options" aria-haspopup="dialog" title="设置（Ctrl+,）">设置</button>
     </header>
+    <section id="findbar" aria-label="正文查找与替换" hidden>
+      <div><input id="needle" aria-label="查找内容" placeholder="查找正文"><output id="matches" aria-live="polite"></output><button id="prev" title="上一个（Shift+Enter）">上一个</button><button id="next" title="下一个（Enter）">下一个</button><button id="find-close" aria-label="关闭查找">×</button></div>
+      <div><input id="replacement" aria-label="替换内容" placeholder="替换为"><button id="replace-one">替换</button><button id="replace-all">全部替换</button></div>
+    </section>
     <div id="error" role="alert" hidden><span id="error-text"></span><button id="retry">重试</button></div>
     <article>
       <input id="title" aria-label="手稿标题" placeholder="未命名手稿" autocomplete="off" disabled>
       <div class="rule"></div>
       <textarea id="body" aria-label="正文" placeholder="从这里落笔…" spellcheck="false" disabled></textarea>
     </article>
-    <footer><span id="save" role="status">正在打开稿本</span><span id="count">0 字</span></footer>
+    <footer><span id="save" role="status">正在打开稿本</span><button id="filepath" aria-label="打开当前保存目录"></button><span id="count">0 字</span></footer>
   </main>
   <dialog id="confirm">
-    <h2>删除这篇手稿？</h2>
+    <h2>从稿本移除这篇手稿？</h2>
     <p id="confirm-text"></p>
-    <form method="dialog"><button value="cancel" autofocus>保留手稿</button><button value="delete" class="danger">删除手稿</button></form>
+    <form method="dialog"><button value="cancel" autofocus>取消</button><button value="delete" class="danger">移除手稿</button></form>
+  </dialog>
+  <dialog id="panel" aria-labelledby="settings-title">
+    <header><h2 id="settings-title">设置</h2><form method="dialog"><button aria-label="关闭设置">完成</button></form></header>
+    <section><h3>文件与保存</h3>
+      <label for="folder">新稿默认保存目录</label>
+      <div class="folder-row"><input id="folder" spellcheck="false"><button id="browse">浏览…</button><button id="apply-folder">应用</button></div>
+      <p id="folder-info" role="status">新稿首次保存时在此创建 TXT；已有文件继续保存到原位置。</p>
+      <label class="setting">停笔后自动保存<select id="delay"><option value="650">0.65 秒</option><option value="2000">2 秒</option><option value="5000">5 秒</option></select></label>
+    </section>
+    <section><h3>写作外观</h3>
+      <div class="settings-grid">
+        <label class="setting">字体<select id="font"><option value="serif">宋体</option><option value="sans">微软雅黑</option><option value="mono">等宽</option></select></label>
+        <div class="setting"><span>字号</span><button id="smaller" aria-label="减小字号">−</button><output id="size"></output><button id="larger" aria-label="增大字号">＋</button></div>
+        <label class="setting">行距<select id="leading"><option value="1.5">紧凑</option><option value="1.75" selected>标准</option><option value="1.95">宽松</option></select></label>
+        <label class="setting">纸张<select id="theme"><option value="paper">米白</option><option value="night">夜色</option></select></label>
+        <label class="setting">正文宽度<select id="width"><option value="reading">阅读宽度</option><option value="full">铺满窗口</option></select></label>
+        <label class="setting">自动换行<input id="wrap" type="checkbox"></label>
+      </div>
+    </section>
   </dialog>
   <script type="module" src="editor.js"></script>
 </body>

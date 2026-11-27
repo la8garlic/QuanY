@@ -1,5 +1,6 @@
-import { desktop, library, type Desk, type Entry, type Note, type Place } from "./ipc.js";
-import { body, count, el, list, search, setFocusMode, settings, status, title, untitled } from "./view.js";
+import { desktop, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
+import { initFind, openFind, resetFind } from "./find.js";
+import { body, count, el, list, search, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
 
 let entries: Entry[] = [];
 let current: number;
@@ -8,7 +9,8 @@ let revision = 0, committed = 0;
 let pending: Promise<void> | undefined;
 let quiet: number, deadline: number | undefined;
 let ready = false, busy = false;
-const file = el<HTMLInputElement>("file");
+let path: string | null;
+let folder: string;
 const confirm = el<HTMLDialogElement>("confirm");
 
 function errorMessage(error: unknown, retry?: () => void) {
@@ -25,14 +27,21 @@ function open(note: Note) {
   lastPlace = note.place;
   body.setSelectionRange(lastPlace.start, lastPlace.end);
   body.scrollTop = lastPlace.top;
-  revision = committed = 0;
+  path = note.path;
+  committed = 0;
+  revision = note.pending ? 1 : 0;
+  displayPath();
+  resetFind();
   el("error").hidden = true;
   count(note.body);
-  status("已保存到本机");
+  status(note.pending ? "TXT 待写入" : path ? "已保存" : "本地草稿", note.pending ? "dirty" : "saved");
+  if (note.notice) { status("本地恢复稿"); errorMessage(note.notice); }
   list(entries, current);
 }
 
 function show(desk: Desk) {
+  folder = desk.folder;
+  setDirectory(folder);
   entries = desk.entries;
   search.value = "";
   open(desk.note);
@@ -44,20 +53,32 @@ function stopTimers() {
   deadline = undefined;
 }
 
+function displayPath() {
+  const label = el("filepath");
+  label.textContent = path ?? folder;
+  label.title = (path ?? folder) + "（点击打开所在目录）";
+}
+
+function saved(result: Saved) {
+  path = result.path;
+  displayPath();
+  entries = [result.entry, ...entries.filter(item => item.id !== current)];
+  list(entries, current);
+}
+
 async function write() {
   // 同一时刻仅允许一笔写入。等待磁盘时仍可输入，旧应答只确认它携带的版本。
   while (committed < revision) {
     const version = revision, text = body.value;
     status("正在保存", "dirty");
     const place = position();
-    const entry = await library.save(current, title.value, text, place);
+    const result = await library.save({id:current, title:title.value, body:text, place});
     lastPlace = place;
     committed = version;
-    entries = [entry, ...entries.filter(item => item.id !== current)];
-    list(entries, current);
+    saved(result);
     count(text);
   }
-  status("已保存到本机");
+  status("已保存");
 }
 
 function position(): Place {
@@ -88,11 +109,11 @@ function changed() {
   revision++;
   status("等待保存", "dirty");
   clearTimeout(quiet);
-  quiet = window.setTimeout(autoSave, 650);
-  deadline ??= window.setTimeout(autoSave, 4000);
+  quiet = window.setTimeout(autoSave, saveDelay());
+  deadline ??= window.setTimeout(autoSave, Math.max(saveDelay(), 4000));
 }
 title.oninput = body.oninput = changed;
-window.addEventListener("blur", autoSave);
+window.addEventListener("blur", () => { if (!busy) autoSave(); });
 
 body.addEventListener("beforeinput", e => {
   // WebView2 会把多行 insertText 拆成逐段编辑；大段听写或批量输入时一次提交可保留原生撤销。
@@ -148,34 +169,41 @@ el("notes").onclick = e => {
   });
 };
 search.oninput = () => list(entries, current);
-el("import").onclick = () => { if (ready && !busy) file.click(); };
-file.onchange = () => {
-  const source = file.files?.[0];
-  file.value = "";
-  if (!source) return;
-  void action(async () => {
-    const bytes = new Uint8Array(await source.arrayBuffer());
-    let encoding = "utf-8";
-    if (bytes[0] === 0xff && bytes[1] === 0xfe) encoding = "utf-16le";
-    if (bytes[0] === 0xfe && bytes[1] === 0xff) encoding = "utf-16be";
-    let text: string;
-    try { text = new TextDecoder(encoding, { fatal: true }).decode(bytes); }
-    catch (cause) { throw new Error("无法读取文本编码，请使用 UTF-8 或带 BOM 的 UTF-16 文本。", { cause }); }
-    if (text.includes("\0")) throw new Error("文件含有空字符，请选择纯文本文件。");
-    show(await library.create(source.name.replace(/\.[^.]+$/, ""), text.replace(/\r\n?/g, "\n")));
-    body.focus();
-  });
-};
-el("export").onclick = () => action(async () => {
-  // 即使稿本磁盘写满，仍允许把当前屏幕上的文字导出到另一块磁盘。
-  const name = title.value.trim() || body.value.slice(0, 80).trim().split("\n")[0] || untitled;
-  await library.export(name, body.value);
+el("filepath").onclick = () => action(() => library.openLocation(current), false);
+el("open-file").onclick = () => action(async () => {
+  const desk = await library.open();
+  if (desk) show(desk);
+  body.focus();
+});
+el("save-file").onclick = () => action(async () => {
+  if (revision === committed) revision++;
+  await flush();
+  body.focus();
+}, false);
+el("save-as").onclick = () => action(async () => {
+  stopTimers();
+  // 切换目标前先等在途写入结束；原路径报错时仍可将恢复稿另存到可用目录。
+  if (pending) await flush();
+  try {
+    const place = position();
+    const result = await library.saveAs({id:current, title:title.value, body:body.value, place}, revision !== committed);
+    if (result) {
+      committed = revision;
+      lastPlace = place;
+      saved(result);
+      count(body.value);
+      status("已保存");
+      el("error").hidden = true;
+    }
+  } finally {
+    if (revision !== committed) autoSave();
+  }
+  body.focus();
 }, false);
 el("remove").onclick = () => {
   if (!ready || busy) return;
-  el("panel").hidden = true;
-  el("options").setAttribute("aria-expanded", "false");
-  el("confirm-text").textContent = "“" + (title.value.trim() || body.value.slice(0, 32).trim() || untitled) + "” 将从本机稿本中永久删除。";
+
+  el("confirm-text").textContent = "“" + (title.value.trim() || body.value.slice(0, 32).trim() || untitled) + "” 将从稿本移除。已保存的 TXT 文件会保留。";
   confirm.returnValue = "cancel";
   confirm.showModal();
 };
@@ -187,17 +215,19 @@ confirm.onclose = () => {
 };
 
 document.addEventListener("keydown", e => {
-  if (e.isComposing || !ready || confirm.open) return;
   const key = e.key.toLowerCase();
   // 桌面编辑器里刷新页面会绕过关闭保存流程。
   if (key === "f5" || (e.ctrlKey && key === "r")) e.preventDefault();
+  if (e.isComposing || !ready || confirm.open || el<HTMLDialogElement>("panel").open) return;
   if (key === "enter" && e.target === title) { e.preventDefault(); body.focus(); }
-  if (e.ctrlKey && !e.altKey && ["n", "o", "s"].includes(key)) {
+  if (e.ctrlKey && !e.altKey && ["n", "o", "s", ",", "f", "h"].includes(key)) {
     e.preventDefault();
     if (key === "n") el("new").click();
-    if (key === "o") el("import").click();
-    if (key === "s" && e.shiftKey) el("export").click();
-    if (key === "s" && !e.shiftKey) autoSave();
+    if (key === "o") el("open-file").click();
+    if (key === "s" && e.shiftKey) el("save-as").click();
+    if (key === "s" && !e.shiftKey) el("save-file").click();
+    if (key === ",") el("options").click();
+    if (key === "f" || key === "h") openFind(key === "h");
   }
   if (key === "f8") { e.preventDefault(); el("focus").click(); }
   if (key === "escape" && document.body.classList.contains("focused")) setFocusMode(false);
@@ -221,5 +251,6 @@ async function boot() {
     errorMessage(error, boot);
   }
 }
-settings();
+settings(value => { folder = value; displayPath(); });
+initFind();
 void boot();
