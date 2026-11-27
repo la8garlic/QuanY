@@ -3,6 +3,8 @@ name = "quany"
 version = "1.6.5"
 edition = "2021"
 description = "泉涌（QuanY）· 本地写作记事本"
+license = "Apache-2.0"
+repository = "https://github.com/la8garlic/QuanY"
 build = "build.rs"
 
 [build-dependencies]
