@@ -2,10 +2,12 @@ import { initResearch } from "./research.js";
 import { initKeys, localAction } from "./shortcuts.js";
 import { desktop, standby, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
-import { body, count, el, list, search, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
+import { body, count, el, search, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
 
 let entries: Entry[] = [];
 let current: number;
+type Publish = (entries: Entry[], current: number, clearSearch: boolean) => void;
+let publish: Publish;
 let lastPlace: Place;
 let revision = 0, committed = 0;
 let pending: Promise<void> | undefined;
@@ -22,7 +24,7 @@ function errorMessage(error: unknown, retry?: () => void) {
   el("retry").onclick = () => { el("error").hidden = true; retry?.(); };
 }
 
-function open(note: Note) {
+function open(note: Note, clearSearch = false) {
   current = note.id;
   title.value = note.title;
   body.value = note.body;
@@ -40,15 +42,14 @@ function open(note: Note) {
   updateReference();
   status(note.pending ? "TXT 待写入" : path ? "已保存" : "本地草稿", note.pending ? "dirty" : "saved");
   if (note.notice) { status("本地恢复稿"); errorMessage(note.notice); }
-  list(entries, current);
+  publish(entries, current, clearSearch);
 }
 
 function show(desk: Desk) {
   folder = desk.folder;
   setDirectory(folder);
   entries = desk.entries;
-  search.value = "";
-  open(desk.note);
+  open(desk.note, true);
 }
 
 function stopTimers() {
@@ -71,7 +72,7 @@ function saved(result: Saved) {
   path = result.path;
   displayPath();
   entries = [result.entry, ...entries.filter(item => item.id !== current)];
-  list(entries, current);
+  publish(entries, current, false);
 }
 
 async function write() {
@@ -179,7 +180,7 @@ el("notes").onclick = e => {
     if(term && at>=0)body.setSelectionRange(at,at+term.length);
   });
 };
-search.oninput = () => list(entries, current);
+
 el("filepath").onclick = () => action(() => library.openLocation(current), false);
 el("open-file").onclick = () => action(async () => {
   const desk = await library.open();
@@ -298,4 +299,7 @@ const updateReference=initResearch(()=>current,()=>entries,action,async version=
 },e=>errorMessage(e));
 settings(value => { folder = value; displayPath(); });
 initFind();
-void boot();
+export function startEditor(onLibraryChange: Publish) {
+  publish = onLibraryChange;
+  void boot();
+}

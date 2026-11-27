@@ -2,12 +2,21 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmitOnError": true,
     "rootDir": "ui",
-    "outDir": "dist"
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "noEmit": true
   },
-  "include": ["ui/*.ts"]
+  "include": [
+    "ui/*.ts",
+    "ui/*.tsx"
+  ]
 }
