@@ -4,6 +4,8 @@
 
 QuanY is a plain-text notepad for Windows with English and Simplified Chinese interfaces. Press **Ctrl+Alt+J** to capture a thought in a small window at the bottom right of your screen. Press **Ctrl+Alt+M** to bring back the writing desk. Your manuscripts are TXT files. The local library keeps the catalogue, editing positions and revision history.
 
+![QuanY’s writing desk in Simplified Chinese, with pinned and tagged drafts on the left and an open manuscript on the right](docs/images/main-window.png)
+
 ## Getting started
 
 1. Download `QuanY.exe` above and put it in the directory where you want to keep the application.
