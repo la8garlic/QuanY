@@ -1,12 +1,13 @@
 /** 所有跨进程交互集中在这里，编辑界面只依赖稿件和稿本的类型。 */
-export interface Entry { id: number; title: string; modified: number }
+export interface Details { pinned: boolean; tags: string[]; goal: number }
+export interface Entry extends Details { id: number; title: string; modified: number }
 export interface Place { start: number; end: number; top: number }
 export interface Snapshot {id:number;title:string;body:string;place:Place}
-export interface Note extends Entry, Snapshot { path: string | null; pending: boolean; notice: string | null }
+export interface Note extends Snapshot { modified:number; path: string | null; pending: boolean; notice: string | null }
 export interface Desk { entries: Entry[]; note: Note; folder:string }
 export interface Written {title:string;body:string}
 export interface Revision {seq:number;title:string;written:number}
-export interface SearchHit extends Entry {snippet:string}
+export interface SearchHit { id:number;snippet:string}
 export interface Saved { entry: Entry; path: string }
 
 interface DesktopWindow {
@@ -26,6 +27,7 @@ declare global {
 const { invoke } = window.__TAURI__.core;
 /** 读写成功的应答只在数据库提交之后返回。 */
 export const library = {
+  setDetails:(id:number, details:Details)=>invoke<Entry>("set_details",{id,details}),
   search:(term:string)=>invoke<SearchHit[]>("search_notes",{term}),
   reference:(id:number)=>invoke<Written>("reference_note",{id}),
   revisions:(id:number)=>invoke<Revision[]>("revisions",{id}),

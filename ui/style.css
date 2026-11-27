@@ -189,18 +189,204 @@ button i {
 .library-search:focus-within {
   border-color: var(--accent);
 }
-.list-heading {
+.catalog-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--side-muted);
+  margin: 0 2px 9px;
+  font-size: 12px;
+}
+.catalog-controls select {
+  min-width: 0;
+  max-width: 48%;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 0;
+  background: var(--side);
+  color: inherit;
+  font-size: 12px;
+}
+#catalog-sort {
+  margin-left: auto;
+}
+.note-tags {
+  grid-column: 2;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 3px;
+}
+.note-tags em {
+  font:
+    normal 11px/1.65 "Microsoft YaHei UI",
+    sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 4px;
+  padding: 0 5px;
+  color: var(--accent);
+}
+#details-open {
+  color: var(--muted);
+  font-size: 12px;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 0 0 10px;
+}
+#details-open:hover {
+  color: var(--accent);
+  background: transparent;
+}
+#details-open i,
+.switch-launch i {
+  font-size: 13px;
+}
+#stats-open {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 9px 9px;
   font-size: 12px;
-  color: var(--side-muted);
 }
-.list-heading h2 {
-  margin: 0;
-  font-size: inherit;
-  font-weight: 550;
+#goal-progress {
+  width: 44px;
+  height: 4px;
+  border: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  appearance: none;
+}
+#goal-progress::-webkit-progress-bar {
+  background: var(--line);
+}
+#goal-progress::-webkit-progress-value {
+  background: var(--accent);
+}
+.catalog-dialog {
+  width: min(440px, 94vw);
+  padding: 22px;
+}
+.catalog-dialog header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.catalog-dialog header button {
+  background: none;
+  font-size: 20px;
+  padding: 0 7px;
+  color: var(--muted);
+}
+.entry-name {
+  margin: 3px 0 14px;
+  overflow-wrap: anywhere;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 14px;
+  padding: 12px 0;
+  border-block: 1px solid var(--line);
+}
+.stats-grid div {
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.stats-grid div:first-child {
+  border: 0;
+  padding-left: 0;
+}
+.stats-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.stats-grid dd {
+  margin: 3px 0 0;
+  font:
+    600 22px/1.4 "Segoe UI",
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.catalog-dialog .details-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+.details-form > label:not(.setting) {
+  margin-top: 5px;
+}
+.details-form input:not([type="checkbox"]),
+#switch-query {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tag-suggestions button {
+  font-size: 12px;
+  padding: 2px 5px;
+  color: var(--accent);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dialog-actions button.apply {
+  background: var(--stamp);
+  color: white;
+}
+#switch-query {
+  margin-top: 12px;
+}
+#switch-results {
+  display: grid;
+  max-height: 40vh;
+  margin-top: 8px;
+  overflow: auto;
+}
+#switch-results button {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+#switch-results button[aria-selected="true"] {
+  background: var(--selected);
+  color: var(--accent);
+}
+.switch-hint {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .catalog-controls {
+    flex-wrap: wrap;
+  }
+  .catalog-controls select {
+    max-width: 78%;
+  }
+  .switch-launch i {
+    display: none;
+  }
+  .stats-grid dd {
+    font-size: 18px;
+  }
 }
 #total {
   font-variant-numeric: tabular-nums;

@@ -3,10 +3,10 @@ import { standby, type Bindings } from "./ipc.js";
 import { el } from "./view.js";
 const defaults = {
   new:"Ctrl+N", open:"Ctrl+O", save:"Ctrl+S", saveAs:"Ctrl+Shift+S",
-  find:"Ctrl+F", replace:"Ctrl+H", focus:"F8", settings:"Ctrl+,", quick:"Ctrl+Shift+J",
+  find:"Ctrl+F", replace:"Ctrl+H", focus:"F8", settings:"Ctrl+,", quick:"Ctrl+Shift+J", switcher:"Ctrl+K",
 };
-const labels = {new:"新建手稿",open:"打开文件",save:"保存",saveAs:"另存为",find:"查找",replace:"替换",focus:"专注模式",settings:"设置",quick:"切换速记窗"};
-const targets = {new:"new",open:"open-file",save:"save-file",saveAs:"save-as",find:"find-open",replace:"find-open",focus:"focus",settings:"options",quick:"quick-toggle"};
+const labels = {new:"新建手稿",open:"打开文件",save:"保存",saveAs:"另存为",find:"查找",replace:"替换",focus:"专注模式",settings:"设置",quick:"切换速记窗",switcher:"快速切稿"};
+const targets = {new:"new",open:"open-file",save:"save-file",saveAs:"save-as",find:"find-open",replace:"find-open",focus:"focus",settings:"options",quick:"quick-toggle",switcher:"switch-open"};
 type Action = keyof typeof defaults;
 const actions = Object.keys(defaults) as Action[];
 const bindings = {...defaults};
@@ -23,8 +23,8 @@ function combo(e:KeyboardEvent) {
 }
 function draw() {
   for (const a of actions) {
-    el("key-"+a).textContent = recording===a ? "请按组合键…" : bindings[a];
-    el(targets[a]).title = labels[a]+"（"+bindings[a]+"）";
+    el("key-"+a).textContent = recording===a ? "请按组合键…" : bindings[a] || "未分配";
+    el(targets[a]).title = labels[a]+(bindings[a] ? "（"+bindings[a]+"）" : "");
   }
   el("find-open").title = "查找（"+bindings.find+"） / 替换（"+bindings.replace+"）";
   el("summon-key").textContent = recording==="summon" ? "请按组合键…" : globalKeys.quick.key;
@@ -51,11 +51,14 @@ async function accept(key:string) {
   } catch(error){info.textContent=String(error);}
   finally {updating=false;draw();}
 }
-export function localAction(e:KeyboardEvent) { return actions.find(a=>bindings[a]===combo(e)); }
+export function localAction(e:KeyboardEvent) { const key=combo(e); return key ? actions.find(a=>bindings[a]===key) : undefined; }
 export function initKeys(keys:Bindings, startup:boolean) {
   globalKeys=keys;
   for(const a of actions){
-    bindings[a]=localStorage.getItem("key-"+a) ?? defaults[a];
+    const saved=localStorage.getItem("key-"+a);
+    // 升级时优先保留已有键位；新命令仍可从工具栏打开并自行改键。
+    const taken=a==="switcher" && (actions.some(other=>other!==a && bindings[other]===defaults[a]) || Object.values(keys).some(b=>b.key===defaults[a]));
+    bindings[a]=saved ?? (taken ? "" : defaults[a]);
     const row=document.createElement("div"), name=document.createElement("span"), button=document.createElement("button");
     row.className="setting";name.textContent=labels[a];button.id="key-"+a;button.className="keycap";
     button.onclick=()=>record(a);row.append(name,button);el("bindings").append(row);

@@ -54,6 +54,16 @@ pub async fn start(state: State<'_, Library>) -> Result<Desk, String> {
     })
 }
 
+/// 整理属性独立于正文修改时间，置顶或改标签不会打乱最近编辑顺序。
+#[tauri::command]
+pub async fn set_details(
+    id: i64,
+    details: storage::Details,
+    state: State<'_, Library>,
+) -> Result<Entry, String> {
+    query(&state, |db| storage::set_details(db, id, details))
+}
+
 /// 从本地稿本恢复当前文章与阅读位置。
 #[tauri::command]
 pub async fn select_note(id: i64, state: State<'_, Library>) -> Result<Note, String> {

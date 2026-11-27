@@ -56,7 +56,7 @@ let selected: Written | null = null,
   confirming = false,
   historyToken = 0,
   refToken = 0;
-type Task = (task: () => Promise<void>, saveFirst?: boolean) => Promise<void>;
+type Task = (task: () => Promise<void>, saveFirst?: boolean) => Promise<unknown>;
 export function initResearch(
   noteId: () => number,
   entries: () => Entry[],

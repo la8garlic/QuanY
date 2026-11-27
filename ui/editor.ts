@@ -1,8 +1,8 @@
 import { initResearch } from "./research.js";
 import { initKeys, localAction } from "./shortcuts.js";
-import { desktop, standby, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
+import { desktop, standby, library, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
-import { body, count, el, search, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
+import { body, count, el, setGoal, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
 
 let entries: Entry[] = [];
 let current: number;
@@ -37,6 +37,7 @@ function open(note: Note, clearSearch = false) {
   displayPath();
   resetFind();
   el("error").hidden = true;
+  setGoal(entries.find(entry=>entry.id===current)!.goal);
   count(note.body);
   setModified(note.modified);
   updateReference();
@@ -122,6 +123,12 @@ function changed() {
   deadline ??= window.setTimeout(autoSave, Math.max(saveDelay(), 4000));
 }
 title.oninput = body.oninput = changed;
+// 字数更新与磁盘保存分开，输入长稿时等短暂停笔再扫描。
+let countTimer:number;
+body.addEventListener("input",()=>{
+  clearTimeout(countTimer);
+  countTimer=window.setTimeout(()=>count(body.value),200);
+});
 window.addEventListener("blur", () => { if (!busy) autoSave(); });
 
 body.addEventListener("beforeinput", e => {
@@ -158,6 +165,7 @@ async function action(task: () => Promise<void>, saveFirst = true) {
       }
     }
     await task();
+    return true;
   } catch (error) {
     el("error").dataset.kind = "action";
     errorMessage(error);
@@ -166,20 +174,32 @@ async function action(task: () => Promise<void>, saveFirst = true) {
   }
 }
 
-el("new").onclick = () => action(async () => {
-  show(await library.create("", ""));
-  body.focus();
-});
-el("notes").onclick = e => {
-  const item = (e.target as Element).closest<HTMLButtonElement>("button[data-id]");
-  if(item)void action(async()=>{
-    const id=Number(item.dataset.id);
-    if(id!==current)open(await library.select(id));
+export function createManuscript(name: string) {
+  return action(async () => {
+    show(await library.create(name, ""));
     body.focus();
-    const term=search.value.trim(), at=body.value.toLowerCase().indexOf(term.toLowerCase());
-    if(term && at>=0)body.setSelectionRange(at,at+term.length);
   });
-};
+}
+el("new").onclick = () => createManuscript("");
+
+export function openManuscript(id: number, term = "") {
+  return action(async () => {
+    if (id !== current) open(await library.select(id));
+    body.focus();
+    const at = body.value.toLowerCase().indexOf(term.toLowerCase());
+    if (term && at >= 0) body.setSelectionRange(at, at + term.length);
+  });
+}
+
+export function editDetails(id:number, details:Details) {
+  return action(async()=>{
+    const entry=await library.setDetails(id,details);
+    entries=entries.map(item=>item.id===id?entry:item);
+    setGoal(entry.goal);
+    count(body.value);
+    publish(entries,current,false);
+  });
+}
 
 el("filepath").onclick = () => action(() => library.openLocation(current), false);
 el("open-file").onclick = () => action(async () => {
@@ -263,7 +283,7 @@ document.addEventListener("keydown", e => {
     if(e.repeat)return;
     if(command==="find" || command==="replace") openFind(command==="replace");
     else {
-      const target={new:"new",open:"open-file",save:"save-file",saveAs:"save-as",settings:"options",focus:"focus",quick:"quick-toggle"}[command];
+      const target={new:"new",open:"open-file",save:"save-file",saveAs:"save-as",settings:"options",focus:"focus",quick:"quick-toggle",switcher:"switch-open"}[command];
       el(target).click();
     }
   } else if(key==="escape" && isQuick()){e.preventDefault();void dispatch("hide");}

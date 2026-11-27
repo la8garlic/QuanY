@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { library, type Entry, type SearchHit } from "./ipc";
 
 const shortDate = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" });
@@ -15,25 +15,21 @@ function modifiedLabel(stamp: number) {
     : shortDate.format(time) + " · " + shortTime.format(time);
 }
 
-export function Sidebar() {
-  const [desk, setDesk] = useState<{ entries: Entry[]; current: number | null }>({
-    entries: [],
-    current: null,
-  });
-  const [search, setSearch] = useState("");
+interface SidebarProps {
+  entries: Entry[];
+  current: number | null;
+  tags: string[];
+  search: string;
+  filter: string;
+  onSearch: (s: string) => void;
+  onFilter: (s: string) => void;
+}
+const collate = new Intl.Collator("zh-CN", { numeric: true });
+export function Sidebar({ entries, current, tags, search, filter, onSearch, onFilter }: SidebarProps) {
+  const [sort, setSort] = useState(() => localStorage.getItem("catalog-sort") || "recent");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState("");
   const term = search.trim();
-
-  // 等 React 挂载输入框后再绑定原生编辑事件，输入法和撤销栈共享同一正文节点。
-  useEffect(() => {
-    void import("./editor").then(({ startEditor }) =>
-      startEditor((entries, current, clearSearch) => {
-        setDesk({ entries, current });
-        if (clearSearch) setSearch("");
-      }),
-    );
-  }, []);
 
   useEffect(() => {
     if (!term) return;
@@ -53,9 +49,29 @@ export function Sidebar() {
       active = false;
       clearTimeout(timer);
     };
-  }, [term, desk.entries]);
+  }, [term, entries]);
 
-  const items = term ? hits : desk.entries;
+  const snippets = useMemo(() => new Map(hits.map((h) => [h.id, h.snippet])), [hits]);
+  const items = useMemo(
+    () =>
+      entries
+        .filter(
+          (n) =>
+            (!term || snippets.has(n.id)) &&
+            (!filter || (filter === "pinned" ? n.pinned : n.tags.includes(filter.slice(4)))),
+        )
+        .sort(
+          (a, b) =>
+            Number(b.pinned) - Number(a.pinned) ||
+            (sort === "title"
+              ? collate.compare(a.title, b.title)
+              : sort === "oldest"
+                ? a.modified - b.modified
+                : b.modified - a.modified) ||
+            b.id - a.id,
+        ),
+    [entries, term, snippets, filter, sort],
+  );
   return (
     <aside aria-label="稿本">
       <header className="brand">
@@ -73,14 +89,44 @@ export function Sidebar() {
           id="search"
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearch(e.target.value)}
           placeholder="搜索手稿"
           aria-label="搜索标题或正文"
         />
       </label>
-      <div className="list-heading">
-        <h2>{term ? "搜索结果" : "我的稿本"}</h2>
+      <div className="catalog-controls">
+        <select
+          aria-label="筛选稿本"
+          id="catalog-filter"
+          value={filter}
+          onChange={(e) => onFilter(e.target.value)}
+        >
+          <option value="">全部手稿</option>
+          <option value="pinned">已置顶</option>
+          {tags.length > 0 && (
+            <optgroup label="标签">
+              {tags.map((t) => (
+                <option key={t} value={"tag:" + t}>
+                  {t}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
         <span id="total">{items.length}</span>
+        <select
+          aria-label="手稿排序"
+          id="catalog-sort"
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value);
+            localStorage.setItem("catalog-sort", e.target.value);
+          }}
+        >
+          <option value="recent">最近编辑</option>
+          <option value="oldest">最早编辑</option>
+          <option value="title">按标题</option>
+        </select>
       </div>
       <nav id="notes" aria-label="手稿列表">
         {term && error ? (
@@ -90,21 +136,35 @@ export function Sidebar() {
             <button
               key={entry.id}
               data-id={entry.id}
+              onClick={async () => {
+                const { openManuscript } = await import("./editor");
+                await openManuscript(entry.id, term);
+              }}
               title={entry.title || "未命名手稿"}
-              aria-current={entry.id === desk.current ? "page" : undefined}
+              aria-current={entry.id === current ? "page" : undefined}
             >
               <i className="note-symbol" aria-hidden="true">
-                &#xE8A5;
+                {entry.pinned ? "\uE718" : "\uE8A5"}
               </i>
               <strong>{entry.title || "未命名手稿"}</strong>
               <time dateTime={new Date(entry.modified).toISOString()}>
                 {modifiedLabel(entry.modified)}
               </time>
-              {"snippet" in entry && <small>{String(entry.snippet)}</small>}
+              {term ? (
+                <small>{snippets.get(entry.id)}</small>
+              ) : (
+                entry.tags.length > 0 && (
+                  <span className="note-tags">
+                    {entry.tags.slice(0, 2).map((t) => (
+                      <em key={t}>{t}</em>
+                    ))}
+                  </span>
+                )
+              )}
             </button>
           ))
         )}
-        {term && !error && !items.length && <p>没有匹配的手稿</p>}
+        {!error && !items.length && <p>{filter === "pinned" ? "暂无置顶手稿" : "没有匹配的手稿"}</p>}
       </nav>
       <div className="side-tools">
         <button id="memos">

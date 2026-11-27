@@ -1,7 +1,18 @@
 import { createRoot } from "react-dom/client";
+import { useEffect, useMemo, useState } from "react";
+import type { Entry } from "./ipc";
+import { QuickSwitcher, DetailsDialog } from "./catalog-tools";
 import { Sidebar } from "./sidebar";
 import { Dialogs } from "./dialogs";
-function WritingDesk() {
+function WritingDesk({
+  entry,
+  openDetails,
+  openSwitch,
+}: {
+  entry: Entry | undefined;
+  openDetails: () => void;
+  openSwitch: () => void;
+}) {
   return (
     <main>
       <header className="bar">
@@ -18,6 +29,9 @@ function WritingDesk() {
           </div>
         </details>
 
+        <button id="switch-open" className="switch-launch" onClick={openSwitch} title="快速切稿">
+          <i aria-hidden="true">&#xE8FD;</i> 快速切稿
+        </button>
         <span className="spacer"></span>
         <button className="icon-tool" id="find-open" aria-label="查找">
           <i aria-hidden="true">&#xE721;</i>
@@ -63,6 +77,14 @@ function WritingDesk() {
           <div className="dateline">
             <span aria-hidden="true"></span>
             <time id="modified"></time>
+            <button
+              id="details-open"
+              title="编辑置顶、标签和写作目标"
+              onClick={openDetails}
+              disabled={!entry}
+            >
+              <i aria-hidden="true">&#xE8EC;</i> 手稿详情
+            </button>
           </div>
           <input id="title" aria-label="手稿标题" placeholder="未命名手稿" autoComplete="off" disabled />
 
@@ -90,16 +112,62 @@ function WritingDesk() {
           正在打开稿本
         </span>
         <button id="filepath" aria-label="打开当前保存目录"></button>
-        <span id="count">0 字</span>
+        <button id="stats-open" onClick={openDetails} disabled={!entry} title="字数统计与写作目标">
+          <span id="count">0 字</span>
+          <progress id="goal-progress" aria-label="写作目标完成进度" hidden />
+        </button>
       </footer>
     </main>
   );
 }
 function Workspace() {
+  const [desk, setDesk] = useState<{ entries: Entry[]; current: number | null }>({
+    entries: [],
+    current: null,
+  });
+  const [search, setSearch] = useState(""),
+    [filter, setFilter] = useState("");
+  const [dialog, setDialog] = useState<"details" | "switch" | null>(null);
+  // 先完成窗口挂载再绑定原生编辑器，切换导航不会重建正文或中断输入法。
+  useEffect(() => {
+    void import("./editor").then(({ startEditor }) =>
+      startEditor((entries, current, clear) => {
+        setDesk({ entries, current });
+        if (clear) {
+          setSearch("");
+          setFilter("");
+        }
+      }),
+    );
+  }, []);
+  const tags = useMemo(
+    () =>
+      Array.from(new Set(desk.entries.flatMap((n) => n.tags))).sort((a, b) =>
+        a.localeCompare(b, "zh-CN"),
+      ),
+    [desk.entries],
+  );
+  const entry = desk.entries.find((n) => n.id === desk.current);
+  const activeFilter = filter.startsWith("tag:") && !tags.includes(filter.slice(4)) ? "" : filter;
   return (
     <>
-      <Sidebar />
-      <WritingDesk />
+      <Sidebar
+        {...desk}
+        tags={tags}
+        search={search}
+        filter={activeFilter}
+        onSearch={setSearch}
+        onFilter={setFilter}
+      />
+      <WritingDesk
+        entry={entry}
+        openDetails={() => setDialog("details")}
+        openSwitch={() => setDialog("switch")}
+      />
+      {dialog === "details" && entry && (
+        <DetailsDialog key={entry.id} entry={entry} tags={tags} close={() => setDialog(null)} />
+      )}
+      {dialog === "switch" && <QuickSwitcher entries={desk.entries} close={() => setDialog(null)} />}
       <Dialogs />
     </>
   );

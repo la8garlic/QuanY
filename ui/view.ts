@@ -1,17 +1,19 @@
+import { characterCount } from "./statistics";
 /** 固定模板中的控件在编译时约定类型，动态稿件标题始终作为文本显示。 */
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export const title = el<HTMLInputElement>("title");
 export const body = el<HTMLTextAreaElement>("body");
-export const search = el<HTMLInputElement>("search");
 export const untitled = "未命名手稿";
 import { library } from "./ipc.js";
+let goal = 0;
+export function setGoal(target:number) { goal = target; }
 export function count(text: string) {
-  // 按 Unicode 码点计数，换行和空白不计入正文字数。
-  let n = 0;
-  for (const ch of text) if (!/\s/u.test(ch)) n++;
-  el("count").textContent = n.toLocaleString("zh-CN") + " 字";
+  const n = characterCount(text);
+  el("count").textContent = n.toLocaleString("zh-CN") + (goal ? " / " + goal.toLocaleString("zh-CN") : "") + " 字";
+  const bar = el<HTMLProgressElement>("goal-progress");
+  bar.hidden = !goal;
+  if (goal) { bar.max=goal; bar.value=n; }
 }
-
 export function status(text: string, state = "saved") {
   el("save").textContent = text;
   el("save").dataset.state = state;

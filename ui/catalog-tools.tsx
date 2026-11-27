@@ -1,0 +1,219 @@
+import { useEffect, useRef, useState } from "react";
+import type { Entry } from "./ipc";
+import { manuscriptStats } from "./statistics";
+
+export function DetailsDialog({
+  entry,
+  tags,
+  close,
+}: {
+  entry: Entry;
+  tags: string[];
+  close: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [names, setNames] = useState(entry.tags.join("，"));
+  const [pinned, setPinned] = useState(entry.pinned);
+  const [target, setTarget] = useState(entry.goal ? String(entry.goal) : "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [stats] = useState(() => manuscriptStats(document.querySelector<HTMLTextAreaElement>("#body")!));
+  const parsed = [
+    ...new Set(
+      names
+        .split(/[,，\n]/)
+        .map((n) => n.trim())
+        .filter(Boolean),
+    ),
+  ];
+  useEffect(() => {
+    ref.current!.showModal();
+  }, []);
+  return (
+    <dialog
+      id="note-details"
+      className="catalog-dialog"
+      ref={ref}
+      onClose={close}
+      aria-labelledby="details-heading"
+    >
+      <header>
+        <h2 id="details-heading">手稿详情</h2>
+        <button aria-label="关闭详情" onClick={() => ref.current!.close()}>
+          ×
+        </button>
+      </header>
+      <p className="entry-name">{entry.title || "未命名手稿"}</p>
+      <dl className="stats-grid">
+        {Object.entries(stats).map(([name, value]) => (
+          <div key={name}>
+            <dt>{name}</dt>
+            <dd>{value.toLocaleString()}</dd>
+          </div>
+        ))}
+      </dl>
+      <form
+        className="details-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          try {
+            const { editDetails } = await import("./editor");
+            if (await editDetails(entry.id, { pinned, tags: parsed, goal: Number(target) }))
+              ref.current?.close();
+            else setError("尚未应用，请检查主窗保存状态。");
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <label className="setting">
+          置顶到稿本顶部
+          <input
+            id="detail-pin"
+            type="checkbox"
+            checked={pinned}
+            onChange={(e) => setPinned(e.target.checked)}
+          />
+        </label>
+        <label htmlFor="detail-tags">标签</label>
+        <input
+          id="detail-tags"
+          value={names}
+          onChange={(e) => setNames(e.target.value)}
+          placeholder="多个标签用逗号分隔"
+        />
+        {tags.some((t) => !parsed.includes(t)) && (
+          <div className="tag-suggestions">
+            {tags
+              .filter((t) => !parsed.includes(t))
+              .slice(0, 8)
+              .map((tag) => (
+                <button type="button" key={tag} onClick={() => setNames([...parsed, tag].join("，"))}>
+                  ＋ {tag}
+                </button>
+              ))}
+          </div>
+        )}
+        <label htmlFor="detail-goal">本篇字数目标</label>
+        <input
+          id="detail-goal"
+          type="number"
+          min="0"
+          max="4294967295"
+          step="1"
+          value={target}
+          placeholder="留空关闭目标"
+          onChange={(e) => setTarget(e.target.value)}
+        />
+        {error && <p role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" onClick={() => ref.current!.close()}>
+            取消
+          </button>
+          <button className="apply" id="apply-details" disabled={saving}>
+            保存设置
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [query, setQuery] = useState(""),
+    [selected, setSelected] = useState(0);
+  const term = query.trim(),
+    normalized = term.toLocaleLowerCase();
+  const matches = entries
+    .filter((n) => (n.title || "未命名手稿").toLocaleLowerCase().includes(normalized))
+    .slice(0, 15);
+  const create = term !== "" && !entries.some((n) => n.title === term);
+  const length = matches.length + Number(create);
+  const index = Math.max(0, Math.min(selected, length - 1));
+  useEffect(() => {
+    ref.current!.showModal();
+    ref.current!.querySelector("input")!.focus();
+  }, []);
+  useEffect(() => {
+    ref.current!.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [index, query]);
+  async function choose(which: number) {
+    const editor = await import("./editor");
+    const item = matches[which];
+    if (item ? await editor.openManuscript(item.id) : create && (await editor.createManuscript(term)))
+      ref.current?.close("opened");
+  }
+  return (
+    <dialog
+      id="quick-switch"
+      className="catalog-dialog"
+      ref={ref}
+      onClose={(e) => {
+        if (e.currentTarget.returnValue === "opened")
+          document.querySelector<HTMLTextAreaElement>("#body")!.focus();
+        close();
+      }}
+      aria-label="快速切稿"
+    >
+      <header>
+        <h2>快速切稿</h2>
+        <button aria-label="关闭快速切稿" onClick={() => ref.current!.close()}>
+          ×
+        </button>
+      </header>
+      <input
+        id="switch-query"
+        aria-label="手稿标题"
+        autoFocus
+        placeholder="输入标题，打开或新建手稿…"
+        role="combobox"
+        aria-controls="switch-results"
+        aria-expanded={true}
+        aria-activedescendant={length ? "switch-item-" + index : undefined}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setSelected(0);
+        }}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            if (length) setSelected((index + (e.key === "ArrowDown" ? 1 : -1) + length) % length);
+          }
+          if (e.key === "Enter" && length) {
+            e.preventDefault();
+            void choose(index);
+          }
+        }}
+      />
+      <div id="switch-results" role="listbox">
+        {matches.map((n, i) => (
+          <button
+            role="option"
+            id={"switch-item-" + i}
+            aria-selected={index === i}
+            key={n.id}
+            onClick={() => void choose(i)}
+          >
+            <i aria-hidden="true">&#xE8A5;</i>
+            {n.title || "未命名手稿"}
+          </button>
+        ))}
+        {create && (
+          <button
+            role="option"
+            id={"switch-item-" + matches.length}
+            aria-selected={index === matches.length}
+            onClick={() => void choose(matches.length)}
+          >
+            ＋ 新建「{term}」
+          </button>
+        )}
+      </div>
+      <p className="switch-hint">↑ ↓ 选择　 Enter 打开　 Esc 关闭</p>
+    </dialog>
+  );
+}

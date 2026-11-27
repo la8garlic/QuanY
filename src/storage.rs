@@ -17,9 +17,19 @@ pub struct Library {
 
 #[derive(Serialize)]
 pub struct Entry {
+    #[serde(flatten)]
+    details: Details,
     id: i64,
     title: String,
     modified: i64,
+}
+
+/// 标签、置顶和目标随稿本保存，写出纯文本时只取正文。
+#[derive(Serialize, Deserialize)]
+pub struct Details {
+    pinned: bool,
+    tags: Vec<String>,
+    goal: u32,
 }
 
 #[derive(Serialize)]
@@ -72,6 +82,13 @@ impl Library {
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, label TEXT NOT NULL, body TEXT NOT NULL,
                  modified INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER))
              );
+             CREATE TABLE IF NOT EXISTS details (
+                 note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+                 pinned INTEGER NOT NULL, tags TEXT NOT NULL, goal INTEGER NOT NULL CHECK(goal>=0)
+             );
+             CREATE VIEW IF NOT EXISTS catalog AS
+                 SELECT id,label,modified,coalesce(pinned,0) AS pinned,coalesce(tags,'') AS tags,coalesce(goal,0) AS goal
+                 FROM notes LEFT JOIN details ON details.note=notes.id;
              CREATE TABLE IF NOT EXISTS revisions(seq INTEGER PRIMARY KEY,note INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
                  title TEXT NOT NULL,body TEXT NOT NULL,written INTEGER NOT NULL,created INTEGER NOT NULL DEFAULT(unixepoch()));
              CREATE INDEX IF NOT EXISTS revision_note ON revisions(note,seq DESC);
@@ -125,8 +142,9 @@ pub fn desk(db: &Connection) -> rusqlite::Result<Desk> {
     let id = db.query_row("SELECT note FROM desk WHERE slot=1", [], |r| r.get(0))?;
     let note = read_note(db, id)?;
     // 稿本列表只读索引信息，打开一本长稿不会把其他稿件的正文带入界面。
-    let mut query =
-        db.prepare("SELECT id,label,modified FROM notes ORDER BY modified DESC,id DESC")?;
+    let mut query = db.prepare(
+        "SELECT id,label,modified,pinned,tags,goal FROM catalog ORDER BY modified DESC,id DESC",
+    )?;
     let entries = query
         .query_map([], entry)?
         .collect::<rusqlite::Result<_>>()?;
@@ -137,8 +155,44 @@ pub fn desk(db: &Connection) -> rusqlite::Result<Desk> {
     })
 }
 
+fn read_entry(db: &Connection, id: i64) -> rusqlite::Result<Entry> {
+    db.query_row(
+        "SELECT id,label,modified,pinned,tags,goal FROM catalog WHERE id=?1",
+        [id],
+        entry,
+    )
+}
+
+pub fn set_details(db: &mut Connection, id: i64, details: Details) -> crate::files::Result<Entry> {
+    let mut tags = Vec::new();
+    for tag in &details.tags {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            continue;
+        }
+        if tag.contains(['\r', '\n', ',', '，']) {
+            return Err("标签名称中不能包含逗号或换行。".into());
+        }
+        if !tags.contains(&tag) {
+            tags.push(tag);
+        }
+    }
+    let tx = db.transaction()?;
+    tx.execute("INSERT INTO details(note,pinned,tags,goal) VALUES(?1,?2,?3,?4)
+                ON CONFLICT(note) DO UPDATE SET pinned=excluded.pinned,tags=excluded.tags,goal=excluded.goal",
+        params![id,details.pinned,tags.join("\n"),details.goal])?;
+    let result = read_entry(&tx, id)?;
+    tx.commit()?;
+    Ok(result)
+}
+
 fn entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
     Ok(Entry {
+        details: Details {
+            pinned: r.get(3)?,
+            tags: r.get::<_, String>(4)?.lines().map(str::to_owned).collect(),
+            goal: r.get(5)?,
+        },
         id: r.get(0)?,
         title: r.get(1)?,
         modified: r.get(2)?,
@@ -204,12 +258,12 @@ pub fn save(
 ) -> rusqlite::Result<Entry> {
     let tx = db.transaction()?;
     crate::archive::checkpoint(&tx, id, false)?;
-    let result = tx.query_row(
+    tx.execute(
         "UPDATE notes SET title=?1,body=?2,label=?4,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
-         WHERE id=?3 RETURNING id,label,modified",
+         WHERE id=?3",
         params![title, body, id, label(title, body)],
-        entry,
     )?;
+    let result = read_entry(&tx, id)?;
     bookmark(&tx, id, place)?;
     // 原文件可能位于离线盘；先提交恢复稿，成功写出 TXT 后才清除此标记。
     tx.execute("INSERT OR IGNORE INTO outbox VALUES(?1)", [id])?;
