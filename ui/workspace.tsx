@@ -145,13 +145,13 @@ function WritingDesk({
         </article>
         <section id="reference" hidden aria-label={t("只读参考稿")}>
           <header>
-            <label htmlFor="ref-choice">{t("参考稿")}</label>
+            <label id="ref-label" htmlFor="ref-choice">{t("参考稿")}</label>
             <button id="ref-close" aria-label={t("关闭参考稿")}>
               <X aria-hidden="true" />
             </button>
           </header>
           <select id="ref-choice" aria-label={t("选择参考稿")}></select>
-          <pre id="ref-body"></pre>
+          <div id="ref-body"></div>
         </section>
       </div>
       <footer>

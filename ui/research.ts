@@ -1,4 +1,7 @@
 import { locale, t } from "./i18n";
+import { EditorState } from "@codemirror/state";
+import { standardKeymap } from "@codemirror/commands";
+import { EditorView, keymap } from "@codemirror/view";
 /** 逐行比较两版正文；长稿先剔除共同首尾，限制对照矩阵的内存。 */
 import { library, type Entry, type Written } from "./ipc.js";
 import { writing } from "./writing";
@@ -52,7 +55,9 @@ function changes(oldText: string, newText: string): Change[] {
 const history = el<HTMLDialogElement>("history"),
   versions = el<HTMLSelectElement>("version-list");
 const ref = el("reference"),
-  choice = el<HTMLSelectElement>("ref-choice");
+  choice = el<HTMLSelectElement>("ref-choice"),
+  refBody = el("ref-body");
+let referenceView: EditorView | undefined;
 const restoreButton = el<HTMLButtonElement>("restore");
 let selected: Written | null = null,
   confirming = false,
@@ -142,14 +147,26 @@ export function initResearch(
       await restore(version);
     });
   };
+  function clearRef() {
+    referenceView?.destroy();
+    referenceView = undefined;
+    refBody.replaceChildren();
+  }
   async function readRef() {
     const token = ++refToken;
+    clearRef();
     if (!choice.value) {
-      el("ref-body").textContent = t("稿本中还没有其他手稿。");
+      refBody.textContent = t("稿本中还没有其他手稿。");
       return;
     }
     const text = await library.reference(Number(choice.value));
-    if (token === refToken) el("ref-body").textContent = text.body;
+    if (token !== refToken) return;
+    // 使用独立的只读视口；参考稿的选区、滚动和快捷键与写作窗口分离。
+    referenceView = new EditorView({ parent: refBody, doc: text.body, extensions: [
+      EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.lineWrapping,
+      keymap.of(standardKeymap),
+      EditorView.contentAttributes.of({ tabindex: "0", "aria-labelledby": "ref-label", "aria-readonly": "true" }),
+    ] });
   }
   function refOptions() {
     const id = choice.value;
@@ -159,14 +176,18 @@ export function initResearch(
     choice.disabled = !notes.length;
     void readRef().catch(report);
   }
-  el("reference-open").onclick = () => {
-    ref.hidden = !ref.hidden;
-    el("reference-open").setAttribute("aria-pressed", String(!ref.hidden));
-    if (!ref.hidden) refOptions();
-  };
+  function showReference(visible: boolean) {
+    ref.hidden = !visible;
+    el("reference-open").setAttribute("aria-pressed", String(visible));
+    if (visible) refOptions();
+    else {
+      ++refToken;
+      clearRef();
+    }
+  }
+  el("reference-open").onclick = () => showReference(ref.hidden);
   el("ref-close").onclick = () => {
-    ref.hidden = true;
-    el("reference-open").setAttribute("aria-pressed", "false");
+    showReference(false);
     writing.focus();
   };
   choice.onchange = () => void readRef().catch(report);

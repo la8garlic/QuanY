@@ -1244,11 +1244,15 @@ input[role="switch"]:disabled {
   font-weight: 600;
 }
 #ref-body {
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  flex: 1;
+  min-height: 0;
+  margin-block: 1em;
   font: 16px/1.8 var(--writing);
 }
+#ref-body .cm-editor { height: 100%; }
+#ref-body .cm-scroller { overflow: auto; font: inherit; }
+#ref-body .cm-content, #ref-body .cm-line { padding: 0; }
+#ref-body .cm-focused { outline: 1px solid var(--line); }
 .work-dialog {
   width: min(600px, 94vw);
 }
