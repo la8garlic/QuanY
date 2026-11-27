@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>笺记</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside aria-label="稿本">
+    <header class="brand"><span class="seal" aria-hidden="true">笺</span><strong>笺记</strong></header>
+    <button id="new" class="primary" title="新建手稿（Ctrl+N）"><span aria-hidden="true">＋</span> 新建手稿</button>
+    <input id="search" type="search" placeholder="搜索标题" aria-label="搜索标题">
+    <div class="list-heading"><h2>我的稿本</h2><span id="total">0</span></div>
+    <nav id="notes" aria-label="手稿列表"></nav>
+    <button id="import" class="import">导入文本…</button>
+    <input id="file" type="file" accept=".txt,text/plain" hidden>
+  </aside>
+  <main>
+    <header class="bar">
+      <button id="focus" aria-pressed="false" title="专注模式（F8）">专注</button>
+      <span class="spacer"></span>
+      <button id="export" title="导出 UTF-8 纯文本（Ctrl+Shift+S）">导出文本</button>
+      <button id="options" class="dots" aria-label="写作设置" aria-haspopup="true" aria-expanded="false">•••</button>
+      <section id="panel" aria-label="写作设置" hidden>
+        <div class="setting"><span>正文字号</span><button id="smaller" aria-label="减小字号">−</button><output id="size"></output><button id="larger" aria-label="增大字号">＋</button></div>
+        <label class="setting">正文字体<select id="font"><option value="serif">宋体</option><option value="sans">黑体</option></select></label>
+        <label class="setting">纸张<select id="theme"><option value="paper">米白</option><option value="night">夜色</option></select></label>
+        <button id="remove" class="danger">删除当前手稿…</button>
+      </section>
+    </header>
+    <div id="error" role="alert" hidden><span id="error-text"></span><button id="retry">重试</button></div>
+    <article>
+      <input id="title" aria-label="手稿标题" placeholder="未命名手稿" autocomplete="off" disabled>
+      <div class="rule"></div>
+      <textarea id="body" aria-label="正文" placeholder="从这里落笔…" spellcheck="false" disabled></textarea>
+    </article>
+    <footer><span id="save" role="status">正在打开稿本</span><span id="count">0 字</span></footer>
+  </main>
+  <dialog id="confirm">
+    <h2>删除这篇手稿？</h2>
+    <p id="confirm-text"></p>
+    <form method="dialog"><button value="cancel" autofocus>保留手稿</button><button value="delete" class="danger">删除手稿</button></form>
+  </dialog>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>
