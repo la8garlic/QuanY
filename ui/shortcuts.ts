@@ -17,6 +17,7 @@ let globalKeys: Bindings;
 let recording: Action | "summon" | "main" | null = null;
 let updating = false;
 const reserved = new Set(["F3","F5","Ctrl+R","Ctrl+A","Ctrl+C","Ctrl+V","Ctrl+X","Ctrl+Z","Ctrl+Y","Alt+F4"]);
+const takesTyping = (key: string) => /^Shift\+(?:[A-Z0-9]|,|Space)$/.test(key);
 function combo(e:KeyboardEvent) {
   const key = e.code.replace(/^Key(?=[A-Z]$)|^Digit(?=[0-9]$)/,"");
   if (!/^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|Comma|Space)$/.test(key)) return "";
@@ -53,7 +54,7 @@ function record(a:typeof recording) {if(!updating){recording=a;info.textContent=
 async function accept(key:string) {
   const a=recording;
   if(a===null || updating)return;
-  if(reserved.has(key) || !key || (!key.includes("+") && (a==="summon" || a==="main" || !/^F\d+$/.test(key)))) {
+  if(takesTyping(key) || reserved.has(key) || !key || (!key.includes("+") && (a==="summon" || a==="main" || !/^F\d+$/.test(key)))) {
     info.textContent=t("请使用带修饰键的组合键或编辑器功能键，避开系统和文本编辑保留键。");return;
   }
   if(actions.some(other=>other!==a && bindings[other]===key) || (a!=="summon"&&globalKeys.quick.key===key) || (a!=="main"&&globalKeys.main.key===key)) {
@@ -74,7 +75,8 @@ export function initKeys(keys:Bindings, startup:boolean) {
     const saved=localStorage.getItem("key-"+a);
     // 升级时优先保留已有键位；新命令仍可从工具栏打开并自行改键。
     const taken=a==="switcher" && (actions.some(other=>other!==a && bindings[other]===defaults[a]) || Object.values(keys).some(b=>b.key===defaults[a]));
-    bindings[a]=saved ?? (taken ? "" : defaults[a]);
+    // 旧版本允许录入 Shift+A 等打字组合；升级后让这些命令等待重新分配。
+    bindings[a]=saved && takesTyping(saved) ? "" : saved ?? (taken ? "" : defaults[a]);
     const row=document.createElement("div"), name=document.createElement("span"), button=document.createElement("button");
     row.className="setting";button.id="key-"+a;button.className="keycap";
     button.onclick=()=>record(a);row.append(name,button);el("bindings").append(row);

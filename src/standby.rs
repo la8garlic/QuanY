@@ -6,7 +6,7 @@ use std::{env, error::Error, io, sync::Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, State};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut};
 use winreg::{
     enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE},
     RegKey,
@@ -43,11 +43,21 @@ pub enum Target {
     Quick,
     Main,
 }
-fn register(
-    app: &AppHandle,
-    target: Target,
-    shortcut: Shortcut,
-) -> std::result::Result<(), tauri_plugin_global_shortcut::Error> {
+fn register(app: &AppHandle, target: Target, shortcut: Shortcut) -> Result<()> {
+    // 安装旧设置和录入新设置都经过这里，避免全局键截走其他应用的大写输入。
+    if shortcut.mods == Modifiers::SHIFT
+        && !shortcut
+            .key
+            .to_string()
+            .strip_prefix('F')
+            .is_some_and(|n| n.parse::<u8>().is_ok())
+    {
+        return Err(tr(
+            "此组合键用于文字输入。",
+            "This shortcut is used for typing.",
+        )
+        .into());
+    }
     app.global_shortcut()
         .on_shortcut(shortcut, move |app, _, event| {
             if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
@@ -59,7 +69,8 @@ fn register(
                     },
                 );
             }
-        })
+        })?;
+    Ok(())
 }
 
 fn launch_command() -> io::Result<String> {
