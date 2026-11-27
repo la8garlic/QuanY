@@ -1,6 +1,5 @@
 //! Save shell requests until the editor is ready and has flushed its current draft.
 use crate::{
-    commands::query,
     files,
     language::tr,
     storage::{Desk, Library},
@@ -66,14 +65,17 @@ pub async fn open_next_txt(
     state: State<'_, Library>,
 ) -> Result<Option<Desk>, String> {
     let file = queue.0.lock().expect("open queue poisoned").pop_front();
-    file.map(|path| {
-        query(&state, |db| files::open(db, &path)).map_err(|e| {
-            format!(
-                "{} {}: {e}",
-                tr("无法打开", "Could not open"),
-                path.display()
-            )
+    let Some(path) = file else { return Ok(None) };
+    state
+        .with_files(move |db| {
+            files::open(db, &path).map(Some).map_err(|e| {
+                format!(
+                    "{} {}: {e}",
+                    tr("无法打开", "Could not open"),
+                    path.display()
+                )
+                .into()
+            })
         })
-    })
-    .transpose()
+        .await
 }

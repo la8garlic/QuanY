@@ -155,13 +155,14 @@ fn staged(dir: &Path, bytes: &[u8]) -> io::Result<NamedTempFile> {
     Ok(file)
 }
 
-fn bind(db: &mut Connection, id: i64, path: &Path, bytes: &[u8]) -> Result<()> {
+fn bind(db: &mut Connection, id: i64, path: &Path, bytes: &[u8], body: &str) -> Result<()> {
     let tx = db.transaction()?;
     tx.execute(
         "INSERT INTO links(note,path,baseline) VALUES(?1,?2,?3)
         ON CONFLICT(note) DO UPDATE SET path=excluded.path,baseline=excluded.baseline",
         params![id, path.to_string_lossy(), bytes],
     )?;
+    crate::chunks::consolidate(&tx, id, body)?;
     tx.execute("DELETE FROM outbox WHERE note=?1", [id])?;
     tx.commit()?;
     Ok(())
@@ -182,13 +183,27 @@ pub fn publish(
             ))
         })
         .optional()?;
-    let format = match &link {
-        Some((_, base)) => Text::read(base)?,
-        None => Text::read(&[])?,
-    };
-    let data = match &link {
-        Some((_, base)) if format.body == body => base.clone(),
-        _ => format.encode(body),
+    use std::borrow::Cow;
+    let data: Cow<'_, [u8]> = match &link {
+        // 无 BOM 的 LF 文本已采用编辑器格式，可直接使用正文而不再解码一遍旧稿。
+        Some((_, base))
+            if base.contains(&b'\n')
+                && !base.contains(&b'\r')
+                && !base.starts_with(&[0xef, 0xbb, 0xbf])
+                && !base.starts_with(&[0xfe, 0xff])
+                && !base.starts_with(&[0xff, 0xfe]) =>
+        {
+            Cow::Borrowed(body.as_bytes())
+        }
+        Some((_, base)) => {
+            let format = Text::read(base)?;
+            if format.body == body {
+                Cow::Borrowed(base)
+            } else {
+                Cow::Owned(format.encode(body))
+            }
+        }
+        None => Cow::Owned(Text::read(&[])?.encode(body)),
     };
     let target = match (destination, &link) {
         (Some(path), _) => {
@@ -242,7 +257,7 @@ pub fn publish(
                 }
                 match temp.persist_noclobber(&path) {
                     Ok(_) => {
-                        bind(db, id, &path, &data)?;
+                        bind(db, id, &path, &data, body)?;
                         return Ok(path.to_string_lossy().into_owned());
                     }
                     Err(e) if e.error.kind() == io::ErrorKind::AlreadyExists => temp = e.file,
@@ -273,7 +288,7 @@ pub fn publish(
             )
         })?;
         if disk == data {
-            bind(db, id, &target, &data)?;
+            bind(db, id, &target, &data, body)?;
             return Ok(target.to_string_lossy().into_owned());
         }
         if disk != *base {
@@ -284,7 +299,7 @@ pub fn publish(
         }
     }
     temp.persist(&target)?;
-    bind(db, id, &target, &data)?;
+    bind(db, id, &target, &data, body)?;
     Ok(target.to_string_lossy().into_owned())
 }
 

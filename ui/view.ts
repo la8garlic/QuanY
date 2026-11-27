@@ -1,15 +1,16 @@
 import { locale, onLanguageChange, t, type Message } from "./i18n";
-import { characterCount } from "./statistics";
+import { writing, mountWriting, wrapWriting } from "./writing";
+import { characters } from "./statistics";
 /** 固定模板中的控件在编译时约定类型，动态稿件标题始终作为文本显示。 */
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export const title = el<HTMLInputElement>("title");
-export const body = el<HTMLTextAreaElement>("body");
+mountWriting(el("body"));
 export const untitled = () => t("未命名手稿");
 import { library } from "./ipc.js";
 let goal = 0;
 export function setGoal(target:number) { goal = target; }
-export function count(text: string) {
-  const n = characterCount(text);
+export function count() {
+  const n = writing.state.field(characters);
   el("count").textContent = n.toLocaleString(locale) + (goal ? " / " + goal.toLocaleString(locale) : "") + (locale === "zh-CN" ? " 字" : (goal || n) === 1 ? " character" : " characters");
   const bar = el<HTMLProgressElement>("goal-progress");
   bar.hidden = !goal;
@@ -26,7 +27,7 @@ export function setFocusMode(on: boolean) {
   document.body.classList.toggle("focused", on);
   el("focus").setAttribute("aria-pressed", String(on));
   el("focus-label").textContent = t(on ? "退出专注" : "专注");
-  body.focus();
+  writing.focus();
 }
 
 let directory = "";
@@ -45,7 +46,7 @@ export function settings(onDirectory: (value: string) => void) {
     hint.textContent = note();
     el("save").textContent = t(saveMessage);
     el("focus-label").textContent = t(document.body.classList.contains("focused") ? "退出专注" : "专注");
-    count(body.value);
+    count();
   };
   refresh();
   onLanguageChange(refresh);
@@ -89,7 +90,7 @@ export function settings(onDirectory: (value: string) => void) {
       }
     }
     root.style.setProperty("--text-size", size + "px");
-    body.wrap = wrap.checked ? "soft" : "off";
+    wrapWriting(wrap.checked);
     el("size").textContent = String(size);
     el<HTMLButtonElement>("smaller").disabled = size <= 12;
     el<HTMLButtonElement>("larger").disabled = size >= 36;

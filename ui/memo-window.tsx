@@ -12,6 +12,7 @@ function MemoWindow() {
       <header data-tauri-drag-region>
         <strong data-tauri-drag-region>{t("置顶便笺")}</strong>
         <span role="status" id="memo-status" data-tauri-drag-region></span>
+        <button id="memo-retry" hidden>{t("重试")}</button>
         <button id="memo-remove" disabled>
           {t("删除…")}
         </button>

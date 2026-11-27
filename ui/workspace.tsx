@@ -141,23 +141,17 @@ function WritingDesk({
           </div>
           <input id="title" aria-label={t("手稿标题")} placeholder={t("未命名手稿")} autoComplete="off" disabled />
 
-          <textarea
-            id="body"
-            aria-label={t("正文")}
-            placeholder={t("在这里写下正文…")}
-            spellCheck={false}
-            disabled
-          ></textarea>
+          <div id="body"></div>
         </article>
         <section id="reference" hidden aria-label={t("只读参考稿")}>
           <header>
-            <label htmlFor="ref-choice">{t("参考稿")}</label>
+            <label id="ref-label" htmlFor="ref-choice">{t("参考稿")}</label>
             <button id="ref-close" aria-label={t("关闭参考稿")}>
               <X aria-hidden="true" />
             </button>
           </header>
           <select id="ref-choice" aria-label={t("选择参考稿")}></select>
-          <pre id="ref-body"></pre>
+          <div id="ref-body"></div>
         </section>
       </div>
       <footer>

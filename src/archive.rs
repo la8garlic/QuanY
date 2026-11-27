@@ -6,10 +6,10 @@ use tauri::State;
 
 pub fn checkpoint(db: &Connection, id: i64, force: bool) -> rusqlite::Result<()> {
     let inserted=db.execute("INSERT INTO revisions(note,title,body,written)
-        SELECT id,title,body,modified FROM notes WHERE id=?1 AND (title<>'' OR body<>'')
+        SELECT id,title,body,modified FROM manuscript_text AS n WHERE id=?1 AND (title<>'' OR body<>'')
         AND (?2 OR NOT EXISTS(SELECT 1 FROM revisions WHERE note=?1 AND created>unixepoch()-600))
         AND NOT EXISTS(SELECT 1 FROM revisions r WHERE r.seq=(SELECT max(seq) FROM revisions WHERE note=?1)
-                       AND r.title=notes.title AND r.body=notes.body)",params![id,force])?;
+                       AND r.title=n.title AND r.body=n.body)",params![id,force])?;
     if inserted > 0 {
         db.execute(
             "DELETE FROM revisions WHERE note=?1 AND seq NOT IN
@@ -39,22 +39,38 @@ pub struct Hit {
     snippet: String,
 }
 
-/// 参数化子串匹配保留百分号等普通字符；预览只返回命中附近的正文。
+/// 按 Unicode 简单大小写折叠查找字面文本，使用原文偏移截取预览。
 #[tauri::command]
 pub async fn search_notes(term: String, state: State<'_, Library>) -> Result<Vec<Hit>, String> {
+    let pattern = regex::RegexBuilder::new(&regex::escape(&term))
+        .case_insensitive(true)
+        .build()
+        .map_err(|e| e.to_string())?;
     query(&state, |db| {
-        let mut stmt=db.prepare("WITH hits AS (SELECT id,label,modified,body,instr(lower(body),lower(?1)) AS pos
-        FROM notes WHERE instr(lower(title),lower(?1))>0 OR instr(lower(body),lower(?1))>0)
-        SELECT id,label,modified,substr(body,max(1,pos-12),80) FROM hits ORDER BY modified DESC,id DESC")?;
-        let rows = stmt.query_map([term], |r| {
-            Ok(Hit {
-                id: r.get(0)?,
-                title: r.get(1)?,
-                modified: r.get(2)?,
-                snippet: r.get(3)?,
-            })
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let mut stmt = db.prepare(
+            "SELECT id,label,modified,title,body FROM manuscript_text ORDER BY modified DESC,id DESC",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut hits = Vec::new();
+        while let Some(row) = rows.next()? {
+            let body = row.get_ref(4)?.as_str()?;
+            let start = match pattern.find(body) {
+                Some(hit) => body[..hit.start()]
+                    .char_indices()
+                    .rev()
+                    .nth(11)
+                    .map_or(0, |(i, _)| i),
+                None if pattern.is_match(row.get_ref(3)?.as_str()?) => 0,
+                None => continue,
+            };
+            hits.push(Hit {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                modified: row.get(2)?,
+                snippet: body[start..].chars().take(80).collect(),
+            });
+        }
+        Ok(hits)
     })
 }
 
@@ -62,14 +78,16 @@ pub async fn search_notes(term: String, state: State<'_, Library>) -> Result<Vec
 #[tauri::command]
 pub async fn reference_note(id: i64, state: State<'_, Library>) -> Result<Written, String> {
     query(&state, |db| {
-        Ok(
-            db.query_row("SELECT title,body FROM notes WHERE id=?1", [id], |r| {
+        Ok(db.query_row(
+            "SELECT title,body FROM manuscript_text WHERE id=?1",
+            [id],
+            |r| {
                 Ok(Written {
                     title: r.get(0)?,
                     body: r.get(1)?,
                 })
-            })?,
-        )
+            },
+        )?)
     })
 }
 

@@ -1,7 +1,9 @@
+import { literalSearch } from "./search";
 import { locale, t, type Message } from "./i18n";
 import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Entry } from "./ipc";
+import { writing } from "./writing";
 import { manuscriptStats } from "./statistics";
 
 export function DetailsDialog({
@@ -19,7 +21,7 @@ export function DetailsDialog({
   const [target, setTarget] = useState(entry.goal ? String(entry.goal) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [stats] = useState(() => manuscriptStats(document.querySelector<HTMLTextAreaElement>("#body")!));
+  const [stats] = useState(() => manuscriptStats(writing.state));
   const parsed = [
     ...new Set(
       names
@@ -128,9 +130,9 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
   const [query, setQuery] = useState(""),
     [selected, setSelected] = useState(0);
   const term = query.trim(),
-    normalized = term.toLocaleLowerCase();
+    pattern = literalSearch(term);
   const matches = entries
-    .filter((n) => (n.title || t("未命名手稿")).toLocaleLowerCase().includes(normalized))
+    .filter((n) => pattern.test(n.title || t("未命名手稿")))
     .slice(0, 15);
   const create = term !== "" && !entries.some((n) => n.title === term);
   const length = matches.length + Number(create);
@@ -155,7 +157,7 @@ export function QuickSwitcher({ entries, close }: { entries: Entry[]; close: () 
       ref={ref}
       onClose={(e) => {
         if (e.currentTarget.returnValue === "opened")
-          document.querySelector<HTMLTextAreaElement>("#body")!.focus();
+          writing.focus();
         close();
       }}
       aria-label={t("快速切稿")}

@@ -1,50 +1,64 @@
 import { locale, onLanguageChange } from "./i18n";
 /** 直接查找纯文本偏移量，替换通过编辑控件完成，可使用 Ctrl+Z 撤销。 */
-import { body, el } from "./view.js";
+import { writing, selectText, onTextChange } from "./writing";
+import { el } from "./view.js";
+import { LiteralIndex } from "./literal-index";
 
 const bar = el("findbar"), needle = el<HTMLInputElement>("needle");
 const replacement = el<HTMLInputElement>("replacement");
-let hits: number[] = [];
+let index: LiteralIndex | undefined, count = 0, timer: number | undefined;
+
+function enable(enabled: boolean) {
+  for (const id of ["prev","next","replace-one","replace-all"]) el<HTMLButtonElement>(id).disabled = !enabled;
+}
 
 function recount() {
-  hits = [];
-  const query = needle.value, text = body.value;
-  if (query) {
-    let pos = text.indexOf(query);
-    while (pos >= 0) { hits.push(pos); pos = text.indexOf(query, pos + query.length); }
-  }
-  el("matches").textContent = query ? hits.length + (locale === "zh-CN" ? " 处" : hits.length === 1 ? " match" : " matches") : "";
-  for (const id of ["prev","next","replace-one","replace-all"]) el<HTMLButtonElement>(id).disabled = !hits.length;
+  clearTimeout(timer);
+  timer = undefined;
+  const query = needle.value;
+  if (query !== index?.query) index = query ? new LiteralIndex(query) : undefined;
+  count = index ? index.count(writing.state.doc) : 0;
+  el("matches").textContent = query ? count + (locale === "zh-CN" ? " 处" : count === 1 ? " match" : " matches") : "";
+  enable(count > 0);
+}
+
+function schedule() {
+  clearTimeout(timer);
+  el("matches").textContent = needle.value ? "…" : "";
+  enable(!!needle.value);
+  timer = window.setTimeout(recount, 180);
+}
+
+function nearest(edge: number, back: boolean) {
+  return index!.nearest(writing.state.doc, edge, back);
 }
 
 function move(back: boolean) {
-  if (!hits.length) return;
-  const edge = back ? body.selectionStart : body.selectionEnd;
-  let low = 0, high = hits.length;
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    if (hits[mid]! < edge) low = mid + 1; else high = mid;
-  }
-  const at = hits[(low + hits.length - Number(back)) % hits.length]!;
-  body.focus();
-  body.setSelectionRange(at, at + needle.value.length);
+  if (timer !== undefined) recount();
+  if (!count) return;
+  const at = nearest(back ? writing.state.selection.main.from : writing.state.selection.main.to, back);
+  writing.focus();
+  selectText(at, at + needle.value.length);
 }
 
 function replace(all: boolean) {
-  if (body.readOnly || !hits.length) return;
-  if (!all && (body.selectionEnd-body.selectionStart !== needle.value.length || !hits.includes(body.selectionStart))) move(false);
-  const value = all ? body.value.split(needle.value).join(replacement.value) : replacement.value;
-  body.focus();
-  if (all) body.select();
-  if (value) document.execCommand("insertText",false,value);
-  else document.execCommand("delete");
+  if (timer !== undefined) recount();
+  if (writing.state.readOnly || !count) return;
+  if (!all && (writing.state.selection.main.to-writing.state.selection.main.from !== needle.value.length || nearest(writing.state.selection.main.from, false) !== writing.state.selection.main.from)) move(false);
+  const {doc, selection} = writing.state;
+  const {from, to} = selection.main;
+  const insert = all ? doc.toString().split(needle.value).join(replacement.value) : replacement.value;
+  writing.focus();
+  writing.dispatch({changes: {from: all ? 0 : from, to: all ? doc.length : to, insert},
+    selection: {anchor: (all ? 0 : from) + insert.length}, userEvent: "input.replace"});
   if (!all) move(false);
 }
 
-export function resetFind() { bar.hidden = true; hits = []; }
+export function resetFind() { clearTimeout(timer); timer = undefined; bar.hidden = true; index = undefined; }
 export function openFind(forReplace: boolean) {
-  const selected = body.value.slice(body.selectionStart, body.selectionEnd);
-  if (selected && !selected.includes("\n")) needle.value = selected;
+  const { doc, selection } = writing.state;
+  const { from, to } = selection.main;
+  if (from < to && to <= doc.lineAt(from).to) needle.value = doc.sliceString(from, to);
   bar.hidden = false;
   recount();
   const field = forReplace && needle.value ? replacement : needle;
@@ -53,14 +67,14 @@ export function openFind(forReplace: boolean) {
 }
 export function initFind() {
   el("find-open").onclick = () => openFind(false);
-  el("find-close").onclick = () => { resetFind(); body.focus(); };
+  el("find-close").onclick = () => { resetFind(); writing.focus(); };
   el("next").onclick = () => move(false);
   el("prev").onclick = () => move(true);
   el("replace-one").onclick = () => replace(false);
   el("replace-all").onclick = () => replace(true);
   onLanguageChange(() => { if (!bar.hidden) recount(); });
-  needle.oninput = recount;
-  body.addEventListener("input", () => { if (!bar.hidden) recount(); });
+  needle.oninput = schedule;
+  onTextChange( () => { if (!bar.hidden) schedule(); });
   document.addEventListener("keydown", e => {
     if (bar.hidden || e.isComposing || document.querySelector("dialog[open]")) return;
     if (e.key === "Escape") { e.stopImmediatePropagation(); el("find-close").click(); }

@@ -25,8 +25,10 @@ function collect(name, version, license, url, directory) {
 for (const pkg of metadata.packages.filter(p => p.source).sort((a,b) => a.id.localeCompare(b.id, "en"))) {
   collect(pkg.name, pkg.version, pkg.license, "https://crates.io/crates/" + pkg.name + "/" + pkg.version, dirname(pkg.manifest_path));
 }
-// React 的调度器会进入前端包，Vite 还会注入模块预加载辅助代码。
-for (const name of ["react", "react-dom", "scheduler", "lucide-react", "vite"]) {
+// 锁文件中的生产依赖随前端分发，包含编辑器的传递依赖。
+const { packages } = JSON.parse(readFileSync("package-lock.json", "utf8"));
+for (const name of [...Object.keys(packages).filter(path => path && !packages[path].dev)
+  .map(path => path.slice("node_modules/".length)), "vite"]) {
   const directory = join("node_modules", name);
   const pkg = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
   collect(name, pkg.version, pkg.license, "https://www.npmjs.com/package/" + name + "/v/" + pkg.version, directory);

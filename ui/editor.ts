@@ -1,9 +1,12 @@
+import { ChangeSet, type Text } from "@codemirror/state";
 import { locale, onLanguageChange, t } from "./i18n";
 import { initResearch } from "./research.js";
+import { literalSearch } from "./search";
 import { initKeys, localAction } from "./shortcuts.js";
-import { desktop, standby, library, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
+import { desktop, standby, library, type DraftEdits, type Details, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
-import { body, count, el, setGoal, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
+import { writing, loadWriting, selectText, lockWriting, onTextChange } from "./writing";
+import { count, el, setGoal, setFocusMode, settings, setDirectory, saveDelay, status, title, untitled } from "./view.js";
 
 let entries: Entry[] = [];
 let current: number;
@@ -15,6 +18,9 @@ let pending: Promise<void> | undefined;
 let quiet: number, deadline: number | undefined;
 let ready = false, busy = false;
 let path: string | null;
+let savedTitle: string, savedBody: Text, txtPending: boolean;
+let staged = 0, changes = ChangeSet.empty(0);
+let sending: {version: number; doc: Text; note: DraftEdits} | undefined;
 let folder: string;
 const confirm = el<HTMLDialogElement>("confirm");
 
@@ -29,18 +35,21 @@ function errorMessage(error: unknown, retry?: () => void) {
 function open(note: Note, clearSearch = false) {
   current = note.id;
   title.value = note.title;
-  body.value = note.body;
   lastPlace = note.place;
-  body.setSelectionRange(lastPlace.start, lastPlace.end);
-  body.scrollTop = lastPlace.top;
+  loadWriting(note.body, lastPlace);
   path = note.path;
+  savedTitle = note.title;
+  savedBody = writing.state.doc;
+  changes = ChangeSet.empty(savedBody.length);
+  sending = undefined;
+  txtPending = note.pending;
   committed = 0;
-  revision = note.pending ? 1 : 0;
+  staged = revision = note.pending ? 1 : 0;
   displayPath();
   resetFind();
   el("error").hidden = true;
   setGoal(entries.find(entry=>entry.id===current)!.goal);
-  count(note.body);
+  count();
   setModified(note.modified);
   updateReference();
   status(note.pending ? "TXT 待写入" : path ? "已保存" : "本地草稿", note.pending ? "dirty" : "saved");
@@ -78,23 +87,75 @@ function saved(result: Saved) {
   publish(entries, current, false);
 }
 
+function draftLabel(doc: Text, name: string) {
+  let first = name.trim();
+  if (!first) {
+    const lines = doc.iterLines();
+    for (let line = lines.next(); !line.done; line = lines.next()) {
+      first = line.value.trimStart();
+      if (first) break;
+    }
+  }
+  // 目录预览最多 80 个码点，无需展开长段的剩余文字。
+  return Array.from(first.slice(0, 160)).slice(0, 80).join("");
+}
+
+function encodeEdits(batch: ChangeSet, before: Text, after: Text): DraftEdits["edits"] {
+  const ranges: {from: number; to: number; start: number; end: number}[] = [];
+  const splitsPair = (doc: Text, pos: number) =>
+    pos > 0 && pos < doc.length && /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(doc.sliceString(pos - 1, pos + 1));
+  // DOM 差分可以只改变一个代理码元。跨进程传输时两侧都扩到完整字符。
+  batch.iterChangedRanges((from,to,start,end) => {
+    if (splitsPair(before,from) || splitsPair(after,start)) { from--; start--; }
+    if (splitsPair(before,to) || splitsPair(after,end)) { to++; end++; }
+    const previous = ranges.at(-1);
+    if (previous && from <= previous.to) { previous.to = Math.max(previous.to,to); previous.end = Math.max(previous.end,end); }
+    else ranges.push({from,to,start,end});
+  });
+  return ranges.map(({from,to,start,end}) => ({from,to,insert:after.sliceString(start,end)}));
+}
+
+async function stage() {
+  if (staged < revision) {
+    if (!sending) {
+      const doc = writing.state.doc, name = title.value;
+      if (path && !txtPending && doc.eq(savedBody) && name === savedTitle) {
+        changes = ChangeSet.empty(doc.length);
+        committed = staged = revision;
+        return;
+      }
+      sending = {version: revision, doc, note: {id:current, title:name, label:draftLabel(doc,name),
+        place:position(), token:crypto.randomUUID(), length:changes.length, edits:encodeEdits(changes,savedBody,doc)}};
+      changes = ChangeSet.empty(doc.length);
+    }
+    // 等待应答时新的编辑进入下一批；失败保留原收据，按同一批次重试。
+    await library.stage(sending.note);
+    savedBody = sending.doc;
+    savedTitle = sending.note.title;
+    lastPlace = sending.note.place;
+    staged = sending.version;
+    txtPending = true;
+    sending = undefined;
+  }
+}
+
 async function write() {
-  // 同一时刻仅允许一笔写入。等待磁盘时仍可输入，旧应答只确认它携带的版本。
   while (committed < revision) {
-    const version = revision, text = body.value;
+    if (composing && !busy) return;
     status("正在保存", "dirty");
-    const place = position();
-    const result = await library.save({id:current, title:title.value, body:text, place});
-    lastPlace = place;
+    await stage();
+    if (committed === revision) break;
+    const version = staged;
+    const result = await library.publish(current);
+    txtPending = false;
     committed = version;
     saved(result);
-    count(text);
   }
   status("已保存");
 }
 
 function position(): Place {
-  return { start: body.selectionStart, end: body.selectionEnd, top: body.scrollTop };
+  return { start: writing.state.selection.main.from, end: writing.state.selection.main.to, top: writing.scrollDOM.scrollTop };
 }
 
 async function flush() {
@@ -114,49 +175,33 @@ async function flush() {
 }
 
 function autoSave() {
+  if (composing) return;
   void flush().then(saved => { if (saved) void drainShellFiles(); });
 }
 
-function changed() {
-  revision++;
-  status("等待保存", "dirty");
+function scheduleSave() {
   clearTimeout(quiet);
   quiet = window.setTimeout(autoSave, saveDelay());
   deadline ??= window.setTimeout(autoSave, Math.max(saveDelay(), 4000));
 }
-title.oninput = body.oninput = changed;
-// 字数更新与磁盘保存分开，输入长稿时等短暂停笔再扫描。
-let countTimer:number;
-body.addEventListener("input",()=>{
-  clearTimeout(countTimer);
-  countTimer=window.setTimeout(()=>count(body.value),200);
+function changed() {
+  revision++;
+  status("等待保存", "dirty");
+  scheduleSave();
+}
+title.oninput = changed;
+onTextChange(update => {
+  changes = changes.compose(update.changes);
+  changed();
+  count();
 });
 window.addEventListener("blur", () => { if (!busy) autoSave(); });
-
-body.addEventListener("beforeinput", e => {
-  // WebView2 会把多行 insertText 拆成逐段编辑；大段听写或批量输入时一次提交可保留原生撤销。
-  if (!e.cancelable || e.isComposing || e.inputType !== "insertText" || !e.data || e.data.length < 4096 || !e.data.includes("\n")) return;
-  const text = e.data.replace(/\r\n?/g, "\n");
-  const start = body.selectionStart, end = body.selectionEnd;
-  const expected = body.value.slice(0, start) + text + body.value.slice(end);
-  const span = document.createElement("span");
-  span.style.whiteSpace = "pre-wrap";
-  // 只传文本节点。系统编辑命令会折叠末尾的一个换行，额外补回该换行。
-  span.textContent = text.endsWith("\n") ? text + "\n" : text;
-  if (!document.execCommand("insertHTML", false, span.outerHTML)) return;
-  if (body.value === expected) {
-    e.preventDefault();
-  } else {
-    // 系统转换若改变了任意字符，撤回这次替换，让原来的纯文本输入照常完成。
-    document.execCommand("undo");
-    body.setSelectionRange(start, end);
-  }
-});
 
 async function action(task: () => Promise<void>, saveFirst = true) {
   if (busy || !ready) return;
   busy = true;
-  title.readOnly = body.readOnly = true;
+  title.readOnly = true;
+  lockWriting(true);
   try {
     if (saveFirst) {
       if (!await flush()) return;
@@ -172,7 +217,8 @@ async function action(task: () => Promise<void>, saveFirst = true) {
     el("error").dataset.kind = "action";
     errorMessage(error);
   } finally {
-    title.readOnly = body.readOnly = busy = false;
+    title.readOnly = busy = false;
+    lockWriting(false);
     void drainShellFiles();
   }
 }
@@ -188,7 +234,7 @@ async function drainShellFiles() {
     quickLayout(false);
     let desk: Desk | null;
     while ((desk = await library.openNextTxt()) !== null) show(desk);
-    body.focus();
+    writing.focus();
   });
   draining = false;
   if (!opened) { shellPending = true; return; }
@@ -196,13 +242,17 @@ async function drainShellFiles() {
 }
 function requestShellOpen() { shellPending = true; void drainShellFiles(); }
 document.addEventListener("compositionstart", () => { composing = true; });
-document.addEventListener("compositionend", () => { composing = false; setTimeout(drainShellFiles, 0); });
+document.addEventListener("compositionend", () => {
+  composing = false;
+  if (revision !== committed) { stopTimers(); scheduleSave(); }
+  setTimeout(drainShellFiles, 0);
+});
 document.addEventListener("close", () => { queueMicrotask(drainShellFiles); }, true);
 
 export function createManuscript(name: string) {
   return action(async () => {
     show(await library.create(name, ""));
-    body.focus();
+    writing.focus();
   });
 }
 el("new").onclick = () => createManuscript("");
@@ -210,9 +260,11 @@ el("new").onclick = () => createManuscript("");
 export function openManuscript(id: number, term = "") {
   return action(async () => {
     if (id !== current) open(await library.select(id));
-    body.focus();
-    const at = body.value.toLowerCase().indexOf(term.toLowerCase());
-    if (term && at >= 0) body.setSelectionRange(at, at + term.length);
+    writing.focus();
+    if (term) {
+      const match = literalSearch(term).exec(writing.state.doc.toString());
+      if (match) selectText(match.index, match.index + match[0].length);
+    }
   });
 }
 
@@ -221,7 +273,7 @@ export function editDetails(id:number, details:Details) {
     const entry=await library.setDetails(id,details);
     entries=entries.map(item=>item.id===id?entry:item);
     setGoal(entry.goal);
-    count(body.value);
+    count();
     publish(entries,current,false);
   });
 }
@@ -230,12 +282,12 @@ el("filepath").onclick = () => action(() => library.openLocation(current), false
 el("open-file").onclick = () => action(async () => {
   const desk = await library.open();
   if (desk) show(desk);
-  body.focus();
+  writing.focus();
 });
 el("save-file").onclick = () => action(async () => {
-  if (revision === committed) revision++;
+  if (!path && revision === committed) revision++;
   await flush();
-  body.focus();
+  writing.focus();
 }, false);
 el("save-as").onclick = () => action(async () => {
   stopTimers();
@@ -243,31 +295,35 @@ el("save-as").onclick = () => action(async () => {
   if (pending) await flush();
   try {
     const place = position();
-    const result = await library.saveAs({id:current, title:title.value, body:body.value, place}, revision !== committed);
+    while (staged < revision) await stage();
+    await library.bookmark(current, place);
+    lastPlace = place;
+    const result = await library.saveAs(current);
     if (result) {
+      txtPending = false;
       committed = revision;
       lastPlace = place;
       saved(result);
-      count(body.value);
+      count();
       status("已保存");
       el("error").hidden = true;
     }
   } finally {
     if (revision !== committed) autoSave();
   }
-  body.focus();
+  writing.focus();
 }, false);
 el("remove").onclick = () => {
   if (!ready || busy) return;
 
-  el("confirm-text").textContent = t("“{title}” 将从稿本移除。已保存的 TXT 文件会保留。").replace("{title}", () => title.value.trim() || body.value.slice(0, 32).trim() || untitled());
+  el("confirm-text").textContent = t("“{title}” 将从稿本移除。已保存的 TXT 文件会保留。").replace("{title}", () => title.value.trim() || writing.state.doc.sliceString(0, 32).trim() || untitled());
   confirm.returnValue = "cancel";
   confirm.showModal();
 };
 confirm.onclose = () => {
   if (confirm.returnValue === "delete") void action(async () => {
     show(await library.remove(current));
-    body.focus();
+    writing.focus();
   });
 };
 
@@ -280,7 +336,7 @@ type Intent="quick"|"full"|"quit"|"hide";
 function dispatch(intent:Intent) {
   // 所有隐藏和退出都走保存门槛，写盘失败时用户仍能看到错误并另存为。
   if(intent==="hide" || intent==="quit"){
-    body.blur();title.blur();
+    writing.contentDOM.blur();title.blur();
     return action(async()=>{if(intent==="hide")await desktop.hide();else{await library.closeMemos();await desktop.destroy();}});
   }
   return action(async()=>{
@@ -291,7 +347,7 @@ function dispatch(intent:Intent) {
     const quick=intent==="quick";
     await standby.display(quick);
     quickLayout(quick);
-    body.focus();
+    writing.focus();
   },false);
 }
 el("quick-toggle").onclick=()=>dispatch(isQuick()?"full":"quick");
@@ -301,7 +357,7 @@ document.addEventListener("keydown", e => {
   const key=e.key.toLowerCase();
   if(key==="f5" || (e.ctrlKey && key==="r"))e.preventDefault();
   if(e.isComposing || !ready || document.querySelector("dialog[open]")) return;
-  if(key==="enter" && e.target===title){e.preventDefault();body.focus();}
+  if(key==="enter" && e.target===title){e.preventDefault();writing.focus();}
   const command=localAction(e);
   if(command){
     e.preventDefault();
@@ -331,9 +387,10 @@ async function boot() {
       e.preventDefault();
       await dispatch(el<HTMLInputElement>("resident").checked ? "hide":"quit");
     });
-    title.disabled = body.disabled = false;
+    title.disabled = false;
+    lockWriting(false);
     ready = true;
-    body.focus();
+    writing.focus();
     if (await library.hasShellFiles() || shellPending) requestShellOpen();
     void standby.registerTxt().catch(e => errorMessage(e));
   } catch (error) {
@@ -345,8 +402,9 @@ const fileMenu=el<HTMLDetailsElement>("file-menu");
 fileMenu.addEventListener("click",e=>{if((e.target as Element).closest("button"))fileMenu.open=false;});
 document.addEventListener("pointerdown",e=>{if(!fileMenu.contains(e.target as Node))fileMenu.open=false;});
 const updateReference=initResearch(()=>current,()=>entries,action,async version=>{
-  title.value=version.title;body.value=version.body;body.setSelectionRange(0,0);
-  changed();await flush();body.focus();
+  title.value=version.title;
+  writing.dispatch({changes: {from: 0, to: writing.state.doc.length, insert: version.body}, selection: {anchor: 0}});
+  changed();await flush();writing.focus();
 },e=>errorMessage(e));
 settings(value => { folder = value; displayPath(); });
 initFind();

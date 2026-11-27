@@ -1244,11 +1244,15 @@ input[role="switch"]:disabled {
   font-weight: 600;
 }
 #ref-body {
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  flex: 1;
+  min-height: 0;
+  margin-block: 1em;
   font: 16px/1.8 var(--writing);
 }
+#ref-body .cm-editor { height: 100%; }
+#ref-body .cm-scroller { overflow: auto; font: inherit; }
+#ref-body .cm-content, #ref-body .cm-line { padding: 0; }
+#ref-body .cm-focused { outline: 1px solid var(--line); }
 .work-dialog {
   width: min(600px, 94vw);
 }
@@ -1485,3 +1489,12 @@ main { container-type: inline-size; }
 #show-licenses { margin-top: 12px; }
 #licenses { width: min(720px, 94vw); }
 #licenses textarea { width: 100%; height: min(55vh, 460px); padding: 12px; color: var(--ink); background: var(--paper); font: 13px/1.5 monospace; resize: none; }
+
+/* 外层保持写作栏尺寸，滚动交给视口编辑器。 */
+#body .cm-editor { height: 100%; }
+#body .cm-focused { outline: none; }
+#body .cm-scroller { font: inherit; overflow: auto; }
+#body .cm-content, #body .cm-line { padding: 0; }
+#body .cm-cursor { border-left-color: var(--ink); }
+#body .cm-placeholder { color: var(--muted); opacity: .65; }
+#body .cm-selectionBackground, #body .cm-focused .cm-selectionBackground { background: color-mix(in srgb, var(--accent) 32%, transparent); }
