@@ -1,0 +1,23 @@
+name: 故障报告 / Bug report
+description: 记录可复现的问题。 Describe a reproducible problem.
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: 泉涌与 Windows 版本 / QuanY and Windows versions
+      placeholder: QuanY 1.6.5, Windows 11 x64
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 请使用临时稿件，遮盖个人路径。 Use a disposable document and redact personal paths.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 预期与实际结果 / Expected and actual result
+    validations:
+      required: true

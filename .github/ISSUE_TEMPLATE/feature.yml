@@ -1,0 +1,15 @@
+name: 功能建议 / Feature request
+description: 说明写作场景和希望改善的地方。 Describe the writing task you want to improve.
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: 使用场景 / Use case
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 期望的操作与结果 / Desired interaction and result
+    validations:
+      required: true
