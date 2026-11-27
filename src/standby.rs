@@ -1,6 +1,6 @@
 //! 托盘和系统热键只发出意图；窗口隐藏和退出须经编辑器已有的保存流程。
 use crate::storage::Library;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{env, error::Error, io, sync::Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -22,12 +22,42 @@ struct Geometry {
 }
 pub struct Standby {
     full: Mutex<Option<Geometry>>,
-    binding: Mutex<Binding>,
+    bindings: Mutex<Bindings>,
 }
 #[derive(Clone, Serialize)]
 pub struct Binding {
     key: String,
     issue: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Bindings {
+    quick: Binding,
+    main: Binding,
+}
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Target {
+    Quick,
+    Main,
+}
+fn register(
+    app: &AppHandle,
+    target: Target,
+    shortcut: Shortcut,
+) -> std::result::Result<(), tauri_plugin_global_shortcut::Error> {
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |app, _, event| {
+            if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                signal(
+                    app,
+                    match target {
+                        Target::Quick => "quick",
+                        Target::Main => "full",
+                    },
+                );
+            }
+        })
 }
 
 fn launch_command() -> io::Result<String> {
@@ -75,7 +105,7 @@ pub fn set_autostart(enabled: bool) -> std::result::Result<bool, String> {
 
 #[derive(Serialize)]
 pub struct Preferences {
-    binding: Binding,
+    bindings: Bindings,
     autostart: bool,
     compact: bool,
 }
@@ -85,7 +115,7 @@ pub async fn standby_settings(
     state: State<'_, Standby>,
 ) -> std::result::Result<Preferences, String> {
     Ok(Preferences {
-        binding: state.binding.lock().expect("快捷键锁损坏").clone(),
+        bindings: state.bindings.lock().expect("快捷键锁损坏").clone(),
         autostart: startup_enabled().map_err(|e| e.to_string())?,
         compact: state.full.lock().expect("窗口状态锁损坏").is_some(),
     })
@@ -98,21 +128,35 @@ pub async fn bind_summon(
     state: State<'_, Standby>,
     library: State<'_, Library>,
     key: String,
+    target: Target,
 ) -> std::result::Result<Binding, String> {
     let next: Shortcut = key.parse().map_err(|e| format!("快捷键格式无效：{e}"))?;
     if next.mods.is_empty() {
         return Err("全局快捷键需要修饰键。".into());
     }
-    let mut old = state.binding.lock().expect("快捷键锁损坏");
+    let mut bindings = state.bindings.lock().expect("快捷键锁损坏");
+    let (old, other, sql) = match target {
+        Target::Quick => (
+            &bindings.quick,
+            &bindings.main,
+            "UPDATE standby SET hotkey=?1 WHERE slot=1",
+        ),
+        Target::Main => (
+            &bindings.main,
+            &bindings.quick,
+            "UPDATE main_shortcut SET hotkey=?1 WHERE slot=1",
+        ),
+    };
+    if other.key.parse::<Shortcut>().is_ok_and(|k| k == next) {
+        return Err("主窗口与速记窗不能使用相同的快捷键。".into());
+    }
     if old.key == key && old.issue.is_none() {
         return Ok(old.clone());
     }
     let manager = app.global_shortcut();
-    manager
-        .register(next)
-        .map_err(|e| format!("无法注册 {key}，请换一组按键：{e}"))?;
+    register(&app, target, next).map_err(|e| format!("无法注册 {key}，请换一组按键：{e}"))?;
     let db = library.db.lock().expect("稿本锁损坏");
-    if let Err(e) = db.execute("UPDATE standby SET hotkey=?1 WHERE slot=1", [&key]) {
+    if let Err(e) = db.execute(sql, [&key]) {
         manager
             .unregister(next)
             .map_err(|rollback| format!("{e}；撤回新快捷键失败：{rollback}"))?;
@@ -123,8 +167,12 @@ pub async fn bind_summon(
             .unregister(old.key.as_str())
             .map_err(|e| e.to_string())?;
     }
-    *old = Binding { key, issue: None };
-    Ok(old.clone())
+    let updated = Binding { key, issue: None };
+    match target {
+        Target::Quick => bindings.quick = updated.clone(),
+        Target::Main => bindings.main = updated.clone(),
+    };
+    Ok(updated)
 }
 
 pub fn signal(app: &AppHandle, action: &str) {
@@ -149,15 +197,25 @@ pub fn install(app: &tauri::App) -> Result<()> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS standby(slot INTEGER PRIMARY KEY CHECK(slot=1),hotkey TEXT NOT NULL);
                     INSERT OR IGNORE INTO standby VALUES(1,'Ctrl+Alt+J');")?;
     let key: String = db.query_row("SELECT hotkey FROM standby WHERE slot=1", [], |r| r.get(0))?;
+    db.execute_batch("CREATE TABLE IF NOT EXISTS main_shortcut(slot INTEGER PRIMARY KEY CHECK(slot=1),hotkey TEXT NOT NULL);
+        INSERT OR IGNORE INTO main_shortcut VALUES(1,'Ctrl+Alt+M');")?;
+    let main_key: String =
+        db.query_row("SELECT hotkey FROM main_shortcut WHERE slot=1", [], |r| {
+            r.get(0)
+        })?;
     drop(db);
-    let issue = app
-        .global_shortcut()
-        .register(key.as_str())
-        .err()
-        .map(|e| format!("全局快捷键 {key} 无法注册，请在设置中更换：{e}"));
+    let install_key = |key: String, target| -> Result<Binding> {
+        let issue = register(app.handle(), target, key.parse()?)
+            .err()
+            .map(|e| format!("全局快捷键 {key} 注册失败，请在设置中更换：{e}"));
+        Ok(Binding { key, issue })
+    };
     app.manage(Standby {
         full: Mutex::new(None),
-        binding: Mutex::new(Binding { key, issue }),
+        bindings: Mutex::new(Bindings {
+            quick: install_key(key, Target::Quick)?,
+            main: install_key(main_key, Target::Main)?,
+        }),
     });
     let quick = MenuItem::with_id(app, "quick", "右下角速记", true, None::<&str>)?;
     let full = MenuItem::with_id(app, "full", "打开主窗口", true, None::<&str>)?;

@@ -1,3 +1,4 @@
+import { initResearch } from "./research.js";
 import { initKeys, localAction } from "./shortcuts.js";
 import { desktop, standby, library, type Desk, type Entry, type Note, type Place, type Saved } from "./ipc.js";
 import { initFind, openFind, resetFind } from "./find.js";
@@ -35,6 +36,8 @@ function open(note: Note) {
   resetFind();
   el("error").hidden = true;
   count(note.body);
+  setModified(note.modified);
+  updateReference();
   status(note.pending ? "TXT 待写入" : path ? "已保存" : "本地草稿", note.pending ? "dirty" : "saved");
   if (note.notice) { status("本地恢复稿"); errorMessage(note.notice); }
   list(entries, current);
@@ -54,6 +57,9 @@ function stopTimers() {
   deadline = undefined;
 }
 
+function setModified(value:number) {
+  el("modified").textContent=new Date(value).toLocaleDateString("zh-CN",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
+}
 function displayPath() {
   const label = el("filepath");
   label.textContent = path ?? folder;
@@ -61,6 +67,7 @@ function displayPath() {
 }
 
 function saved(result: Saved) {
+  setModified(result.entry.modified);
   path = result.path;
   displayPath();
   entries = [result.entry, ...entries.filter(item => item.id !== current)];
@@ -164,9 +171,12 @@ el("new").onclick = () => action(async () => {
 });
 el("notes").onclick = e => {
   const item = (e.target as Element).closest<HTMLButtonElement>("button[data-id]");
-  if (item && Number(item.dataset.id) !== current) void action(async () => {
-    open(await library.select(Number(item.dataset.id)));
+  if(item)void action(async()=>{
+    const id=Number(item.dataset.id);
+    if(id!==current)open(await library.select(id));
     body.focus();
+    const term=search.value.trim(), at=body.value.toLowerCase().indexOf(term.toLowerCase());
+    if(term && at>=0)body.setSelectionRange(at,at+term.length);
   });
 };
 search.oninput = () => list(entries, current);
@@ -225,11 +235,11 @@ function dispatch(intent:Intent) {
   // 所有隐藏和退出都走保存门槛，写盘失败时用户仍能看到错误并另存为。
   if(intent==="hide" || intent==="quit"){
     body.blur();title.blur();
-    return action(()=>intent==="hide" ? desktop.hide() : desktop.destroy());
+    return action(async()=>{if(intent==="hide")await desktop.hide();else{await library.closeMemos();await desktop.destroy();}});
   }
   return action(async()=>{
     if(intent==="quick" && !confirm.open){
-      el<HTMLDialogElement>("panel").close();
+      for(const dialog of document.querySelectorAll<HTMLDialogElement>("dialog[open]"))dialog.close();
       resetFind();
     }
     const quick=intent==="quick";
@@ -244,7 +254,7 @@ el("stow").onclick=()=>dispatch("hide");
 document.addEventListener("keydown", e => {
   const key=e.key.toLowerCase();
   if(key==="f5" || (e.ctrlKey && key==="r"))e.preventDefault();
-  if(e.isComposing || !ready || confirm.open || el<HTMLDialogElement>("panel").open) return;
+  if(e.isComposing || !ready || document.querySelector("dialog[open]")) return;
   if(key==="enter" && e.target===title){e.preventDefault();body.focus();}
   const command=localAction(e);
   if(command){
@@ -263,9 +273,9 @@ async function boot() {
   try {
     show(await library.start());
     const prefs=await standby.read();
-    initKeys(prefs.binding,prefs.autostart);
+    initKeys(prefs.bindings,prefs.autostart);
     quickLayout(prefs.compact);
-    if(prefs.binding.issue)errorMessage(prefs.binding.issue);
+    for(const b of Object.values(prefs.bindings))if(b.issue)errorMessage(b.issue);
     await desktop.listen<Intent>("standby-action", e=>{void dispatch(e.payload);});
     await desktop.onCloseRequested(async e => {
       e.preventDefault();
@@ -279,6 +289,13 @@ async function boot() {
     errorMessage(error, boot);
   }
 }
+const fileMenu=el<HTMLDetailsElement>("file-menu");
+fileMenu.addEventListener("click",e=>{if((e.target as Element).closest("button"))fileMenu.open=false;});
+document.addEventListener("pointerdown",e=>{if(!fileMenu.contains(e.target as Node))fileMenu.open=false;});
+const updateReference=initResearch(()=>current,()=>entries,action,async version=>{
+  title.value=version.title;body.value=version.body;body.setSelectionRange(0,0);
+  changed();await flush();body.focus();
+},e=>errorMessage(e));
 settings(value => { folder = value; displayPath(); });
 initFind();
 void boot();

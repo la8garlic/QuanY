@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::{State, Window};
 
-fn query<T>(
+pub(crate) fn query<T>(
     state: &Library,
     action: impl FnOnce(&mut Connection) -> files::Result<T>,
 ) -> Result<T, String> {

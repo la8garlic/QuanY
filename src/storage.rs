@@ -72,6 +72,10 @@ impl Library {
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, label TEXT NOT NULL, body TEXT NOT NULL,
                  modified INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER))
              );
+             CREATE TABLE IF NOT EXISTS revisions(seq INTEGER PRIMARY KEY,note INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                 title TEXT NOT NULL,body TEXT NOT NULL,written INTEGER NOT NULL,created INTEGER NOT NULL DEFAULT(unixepoch()));
+             CREATE INDEX IF NOT EXISTS revision_note ON revisions(note,seq DESC);
+             CREATE TABLE IF NOT EXISTS memos(id INTEGER PRIMARY KEY,body TEXT NOT NULL,modified INTEGER NOT NULL DEFAULT(unixepoch()));
              CREATE INDEX IF NOT EXISTS contents ON notes(modified DESC,id DESC,label);
              CREATE TABLE IF NOT EXISTS places (
                  note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
@@ -151,6 +155,7 @@ fn label(title: &str, body: &str) -> String {
 }
 
 pub fn reload_body(db: &Connection, id: i64, body: &str) -> rusqlite::Result<()> {
+    crate::archive::checkpoint(db, id, false)?;
     let title: String = db.query_row("SELECT title FROM notes WHERE id=?1", [id], |r| r.get(0))?;
     db.execute(
         "UPDATE notes SET body=?2,label=?3,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
@@ -198,6 +203,7 @@ pub fn save(
     place: &Place,
 ) -> rusqlite::Result<Entry> {
     let tx = db.transaction()?;
+    crate::archive::checkpoint(&tx, id, false)?;
     let result = tx.query_row(
         "UPDATE notes SET title=?1,body=?2,label=?4,modified=CAST(unixepoch('subsec')*1000 AS INTEGER)
          WHERE id=?3 RETURNING id,label,modified",

@@ -1,7 +1,9 @@
 #![windows_subsystem = "windows"]
 
+mod archive;
 mod commands;
 mod files;
+mod memos;
 mod standby;
 mod storage;
 mod text;
@@ -37,15 +39,7 @@ fn main() {
         }));
     }
     let result = builder
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _, event| {
-                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        standby::signal(app, "quick");
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let library =
                 workspace(app).and_then(|(dir, texts)| storage::Library::open(&dir, &texts));
@@ -55,6 +49,7 @@ fn main() {
                 }
                 Err(error) => startup_error(error.as_ref()),
             }
+            app.manage(memos::MemoWindows::default());
             if let Err(e) = standby::install(app) {
                 startup_error(e.as_ref());
             }
@@ -66,6 +61,17 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            archive::search_notes,
+            archive::reference_note,
+            archive::revisions,
+            archive::revision_text,
+            archive::mark_version,
+            memos::memo_list,
+            memos::open_memo,
+            memos::memo_read,
+            memos::memo_write,
+            memos::memo_delete,
+            memos::exit_editor,
             commands::start,
             commands::select_note,
             commands::create_note,

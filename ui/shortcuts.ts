@@ -1,5 +1,5 @@
 /** 用物理键位绑定命令，中文输入法组合期间仍由输入法接管按键。 */
-import { standby, type Binding } from "./ipc.js";
+import { standby, type Bindings } from "./ipc.js";
 import { el } from "./view.js";
 const defaults = {
   new:"Ctrl+N", open:"Ctrl+O", save:"Ctrl+S", saveAs:"Ctrl+Shift+S",
@@ -12,8 +12,8 @@ const actions = Object.keys(defaults) as Action[];
 const bindings = {...defaults};
 const info = el("standby-info");
 const message = info.textContent;
-let summon: Binding;
-let recording: Action | "summon" | null = null;
+let globalKeys: Bindings;
+let recording: Action | "summon" | "main" | null = null;
 let updating = false;
 const reserved = new Set(["F3","F5","Ctrl+R","Ctrl+A","Ctrl+C","Ctrl+V","Ctrl+X","Ctrl+Z","Ctrl+Y","Alt+F4"]);
 function combo(e:KeyboardEvent) {
@@ -27,7 +27,8 @@ function draw() {
     el(targets[a]).title = labels[a]+"（"+bindings[a]+"）";
   }
   el("find-open").title = "查找（"+bindings.find+"） / 替换（"+bindings.replace+"）";
-  el("summon-key").textContent = recording==="summon" ? "请按组合键…" : summon.key;
+  el("summon-key").textContent = recording==="summon" ? "请按组合键…" : globalKeys.quick.key;
+  el("main-key").textContent = recording==="main" ? "请按组合键…" : globalKeys.main.key;
 }
 function remember() {
   for (const a of actions) localStorage.setItem("key-"+a,bindings[a]);
@@ -36,23 +37,23 @@ function record(a:typeof recording) {if(!updating){recording=a;info.textContent=
 async function accept(key:string) {
   const a=recording;
   if(a===null || updating)return;
-  if(reserved.has(key) || !key || (!key.includes("+") && (a==="summon" || !/^F\d+$/.test(key)))) {
+  if(reserved.has(key) || !key || (!key.includes("+") && (a==="summon" || a==="main" || !/^F\d+$/.test(key)))) {
     info.textContent="请使用带修饰键的组合键或编辑器功能键，避开系统和文本编辑保留键。";return;
   }
-  if(actions.some(other=>other!==a && bindings[other]===key) || (a!=="summon"&&summon.key===key)) {
+  if(actions.some(other=>other!==a && bindings[other]===key) || (a!=="summon"&&globalKeys.quick.key===key) || (a!=="main"&&globalKeys.main.key===key)) {
     info.textContent="此组合键已经分配给其他操作。";return;
   }
   updating=true;
   try {
-    if(a==="summon")summon=await standby.bind(key);
+    if(a==="summon" || a==="main"){const target=a==="main"?"main":"quick";globalKeys[target]=await standby.bind(key,target); }
     else { bindings[a]=key; remember(); }
     recording=null;info.textContent="快捷键已保存。";
   } catch(error){info.textContent=String(error);}
   finally {updating=false;draw();}
 }
 export function localAction(e:KeyboardEvent) { return actions.find(a=>bindings[a]===combo(e)); }
-export function initKeys(binding:Binding, startup:boolean) {
-  summon=binding;
+export function initKeys(keys:Bindings, startup:boolean) {
+  globalKeys=keys;
   for(const a of actions){
     bindings[a]=localStorage.getItem("key-"+a) ?? defaults[a];
     const row=document.createElement("div"), name=document.createElement("span"), button=document.createElement("button");
@@ -69,9 +70,10 @@ export function initKeys(binding:Binding, startup:boolean) {
     catch(error){login.checked=!wanted;info.textContent=String(error);}
     finally{login.disabled=false;}
   };
+  el("main-key").onclick=()=>record("main");
   el("summon-key").onclick=()=>record("summon");
   el("reset-keys").onclick=()=>{
-    if(Object.values(defaults).includes(summon.key)){info.textContent="全局键占用默认编辑键位，请先更换全局键。";return;}
+    if(Object.values(globalKeys).some(b=>Object.values(defaults).includes(b.key))){info.textContent="全局键占用默认编辑键位，请先更换全局键。";return;}
     Object.assign(bindings,defaults);remember();record(null);
   };
   el<HTMLDialogElement>("panel").addEventListener("close",()=>record(null));
@@ -83,5 +85,6 @@ export function initKeys(binding:Binding, startup:boolean) {
     void accept(combo(e));
   },true);
   draw();
-  if(binding.issue)info.textContent=binding.issue;
+  const issues=Object.values(keys).flatMap(b=>b.issue?[b.issue]:[]);
+  if(issues.length)info.textContent=issues.join(" ");
 }
