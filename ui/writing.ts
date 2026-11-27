@@ -2,6 +2,7 @@ import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
 import { history, historyKeymap, insertNewline, standardKeymap } from "@codemirror/commands";
 import { drawSelection, EditorView, keymap, placeholder, type ViewUpdate } from "@codemirror/view";
 import { onLanguageChange, t } from "./i18n";
+import { characters } from "./statistics";
 import type { Place } from "./ipc";
 
 // 文档和选区使用全文 UTF-16 偏移；DOM 只承载视口附近的行。
@@ -17,7 +18,7 @@ const keys = keymap.of([{ key: "Enter", run: insertNewline, shift: insertNewline
 function state(doc: string, start: number, end: number) {
   return EditorState.create({doc,
     selection: EditorSelection.single(Math.min(doc.length, start), Math.min(doc.length, end)),
-    extensions: [keys, history(), drawSelection(), labels.of(language()), access.of(accessRules()),
+    extensions: [characters, keys, history(), drawSelection(), labels.of(language()), access.of(accessRules()),
       wrapping.of(wrapped ? EditorView.lineWrapping : []),
       EditorView.updateListener.of(update => {
         if (update.docChanged) for (const callback of subscribers) callback(update);

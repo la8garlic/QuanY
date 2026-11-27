@@ -44,7 +44,7 @@ function open(note: Note, clearSearch = false) {
   resetFind();
   el("error").hidden = true;
   setGoal(entries.find(entry=>entry.id===current)!.goal);
-  count(note.body);
+  count();
   setModified(note.modified);
   updateReference();
   status(note.pending ? "TXT 待写入" : path ? "已保存" : "本地草稿", note.pending ? "dirty" : "saved");
@@ -101,7 +101,6 @@ async function write() {
     lastPlace = place;
     committed = version;
     saved(result);
-    count(text);
   }
   status("已保存");
 }
@@ -142,11 +141,9 @@ function changed() {
   scheduleSave();
 }
 title.oninput = changed;
-let countTimer: number;
 onTextChange(() => {
   changed();
-  clearTimeout(countTimer);
-  countTimer = window.setTimeout(() => count(writing.state.doc.toString()), 200);
+  count();
 });
 window.addEventListener("blur", () => { if (!busy) autoSave(); });
 
@@ -226,7 +223,7 @@ export function editDetails(id:number, details:Details) {
     const entry=await library.setDetails(id,details);
     entries=entries.map(item=>item.id===id?entry:item);
     setGoal(entry.goal);
-    count(writing.state.doc.toString());
+    count();
     publish(entries,current,false);
   });
 }
@@ -258,7 +255,7 @@ el("save-as").onclick = () => action(async () => {
       committed = revision;
       lastPlace = place;
       saved(result);
-      count(writing.state.doc.toString());
+      count();
       status("已保存");
       el("error").hidden = true;
     }

@@ -1,6 +1,6 @@
 import { locale, onLanguageChange, t, type Message } from "./i18n";
 import { writing, mountWriting, wrapWriting } from "./writing";
-import { characterCount } from "./statistics";
+import { characters } from "./statistics";
 /** 固定模板中的控件在编译时约定类型，动态稿件标题始终作为文本显示。 */
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export const title = el<HTMLInputElement>("title");
@@ -9,8 +9,8 @@ export const untitled = () => t("未命名手稿");
 import { library } from "./ipc.js";
 let goal = 0;
 export function setGoal(target:number) { goal = target; }
-export function count(text: string) {
-  const n = characterCount(text);
+export function count() {
+  const n = writing.state.field(characters);
   el("count").textContent = n.toLocaleString(locale) + (goal ? " / " + goal.toLocaleString(locale) : "") + (locale === "zh-CN" ? " 字" : (goal || n) === 1 ? " character" : " characters");
   const bar = el<HTMLProgressElement>("goal-progress");
   bar.hidden = !goal;
@@ -46,7 +46,7 @@ export function settings(onDirectory: (value: string) => void) {
     hint.textContent = note();
     el("save").textContent = t(saveMessage);
     el("focus-label").textContent = t(document.body.classList.contains("focused") ? "退出专注" : "专注");
-    count(writing.state.doc.toString());
+    count();
   };
   refresh();
   onLanguageChange(refresh);
