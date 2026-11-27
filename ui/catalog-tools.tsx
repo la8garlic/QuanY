@@ -4,7 +4,7 @@ import { FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Entry } from "./ipc";
 import { writing } from "./writing";
-import { characters, manuscriptStats } from "./statistics";
+import { manuscriptStats } from "./statistics";
 
 export function DetailsDialog({
   entry,
@@ -21,7 +21,7 @@ export function DetailsDialog({
   const [target, setTarget] = useState(entry.goal ? String(entry.goal) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [stats] = useState(() => manuscriptStats(writing.state.doc.toString(), writing.state.selection.main.from, writing.state.selection.main.to, writing.state.field(characters)));
+  const [stats] = useState(() => manuscriptStats(writing.state));
   const parsed = [
     ...new Set(
       names
