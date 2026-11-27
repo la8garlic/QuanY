@@ -2,12 +2,14 @@
 
 [English](guide.en.md) · [返回首页](../README.md)
 
-## 下载与校验
+## 下载与语言
 
-从同一发行页下载 ZIP 和 `SHA256SUMS.txt`。在 PowerShell 中运行以下命令，将结果与校验文件中同名 ZIP 前的 64 位摘要逐字比较，再解压运行。校验针对压缩包。首发 EXE 没有 Windows Authenticode 签名。
+下载 [QuanY.exe](https://github.com/la8garlic/QuanY/releases/latest/download/QuanY.exe)，双击打开。首次启动按系统语言选择中文或英文。在「设置 → 待命与快捷键 → 界面语言」可随时切换，应用会记住选择。
+
+若要确认下载的文件与发行页一致，可运行下面的命令，与同一版本 `SHA256SUMS.txt` 中的摘要比较。此步骤可选。当前 EXE 尚无 Windows 代码签名。
 
 ```powershell
-Get-FileHash .\QuanY-1.6.5-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\QuanY.exe -Algorithm SHA256
 ```
 
 ## 常用快捷键
@@ -31,4 +33,4 @@ TXT 只包含正文。标题、标签、置顶、修订、独立便笺等数据�
 
 ## 升级与排错
 
-正常退出后，将新发行包解压到原程序目录。更换 EXE 所在位置时，先关闭登录启动，移动后再从新位置启动并启用。报告故障请附应用版本、Windows 版本、复现步骤和空白稿件上的表现。截图中的文件名、账户目录和正文应先遮盖。
+正常退出后，用新下载的 QuanY.exe 替换原程序。更换 EXE 所在位置时，先关闭登录启动，移动后再从新位置启动并启用。报告故障请附应用版本、Windows 版本、复现步骤和空白稿件上的表现。截图中的文件名、账户目录和正文应先遮盖。

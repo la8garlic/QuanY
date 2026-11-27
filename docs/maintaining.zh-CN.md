@@ -24,11 +24,11 @@ Windows 工作流在 PR 和主分支运行，默认令牌只有读取源码权�
 ```powershell
 gh run view RUN_ID --repo la8garlic/QuanY --json headSha,headBranch,event,conclusion,url
 gh run download RUN_ID --repo la8garlic/QuanY --name QuanY-windows-x64 --dir release-download
-Get-FileHash .\release-download\QuanY-VERSION-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\release-download\QuanY.exe -Algorithm SHA256
 ```
 
-3. 核对 SHA-256、ZIP 内 EXE 版本、架构和声明文件，以临时稿本抽查启动及保存。由维护者在上述 SHA 上创建带说明的 `vVERSION` 标签并推送。
-4. 使用 `gh release create vVERSION --verify-tag --draft` 建草稿，在草稿中上传 ZIP 和 `SHA256SUMS.txt`，附上双语说明及 CI 运行链接。核对后发布。仓库启用不可变发行版，修正二进制或说明附件时应发布新版本。
-5. 从公开发行页重新下载 ZIP 和摘要，核对散列值，使用 `gh release view vVERSION` 确认标签、附件和公开状态。GitHub 自动提供该标签的源代码归档。
+3. 核对 SHA-256、EXE 版本、架构和程序内的许可证声明，以临时稿本抽查启动及保存。由维护者在上述 SHA 上创建带说明的 `vVERSION` 标签并推送。
+4. 使用 `gh release create vVERSION --verify-tag --draft` 建草稿，在草稿中上传 QuanY.exe 和 `SHA256SUMS.txt`，附上双语说明及 CI 运行链接。核对后发布。仓库启用不可变发行版，修正二进制或说明附件时应发布新版本。
+5. 从公开发行页重新下载 QuanY.exe 和摘要，核对散列值，使用 `gh release view vVERSION` 确认标签、附件和公开状态。GitHub 自动提供该标签的源代码归档。
 
 [GitHub 规则集](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) · [Actions 安全](https://docs.github.com/en/actions/reference/security/secure-use) · [管理 Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)

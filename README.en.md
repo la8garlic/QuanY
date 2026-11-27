@@ -1,15 +1,15 @@
 # QuanY (泉涌)
 
-[简体中文](README.md) · [Download for Windows](https://github.com/la8garlic/QuanY/releases/latest) · [User guide](docs/guide.en.md)
+[简体中文](README.md) · [Download for Windows x64](https://github.com/la8garlic/QuanY/releases/latest/download/QuanY.exe) · [User guide](docs/guide.en.md)
 
-QuanY is a plain-text notepad for Windows with a Chinese-language interface. Press **Ctrl+Alt+J** to capture a thought in a small window at the bottom right of your screen. Press **Ctrl+Alt+M** to bring back the writing desk. Your manuscripts are TXT files. The local library keeps the catalogue, editing positions and revision history.
+QuanY is a plain-text notepad for Windows with English and Simplified Chinese interfaces. Press **Ctrl+Alt+J** to capture a thought in a small window at the bottom right of your screen. Press **Ctrl+Alt+M** to bring back the writing desk. Your manuscripts are TXT files. The local library keeps the catalogue, editing positions and revision history.
 
 ## Getting started
 
-1. Download `QuanY-1.6.5-windows-x64.zip` from Releases. Extract the archive into the directory where you want to keep the application.
-2. Open `QuanY.exe`, enter a title and some text, and wait for **已保存** (saved). Click the path in the status bar to open the containing folder.
-3. Under **设置 → 文件与保存** (Settings → Files and saving), choose a folder for new manuscripts and an autosave interval. The initial folder is **泉涌** inside your Windows Documents folder.
-4. Under **待命与快捷键** (Tray and shortcuts), choose whether closing the window keeps the app in the tray, whether it starts at sign-in, and which shortcuts summon each window.
+1. Download `QuanY.exe` above and put it in the directory where you want to keep the application.
+2. Open `QuanY.exe`, enter a title and some text, and wait for **Saved**. Click the path in the status bar to open the containing folder.
+3. Under **Settings → Files & saving**, choose a folder for new manuscripts and an autosave interval. The initial folder is **泉涌** inside your Windows Documents folder.
+4. Under **Tray & shortcuts**, choose whether closing the window keeps the app in the tray, whether it starts at sign-in, and which shortcuts summon each window. The language selector is on the same page.
 
 The portable build targets Windows x64 and uses the Microsoft Edge WebView2 Evergreen Runtime. If the runtime is missing, install it from [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/).
 
@@ -32,9 +32,9 @@ npm ci
 npm run release
 ```
 
-The executable is written to `release/QuanY.exe`. Public distributions include project and third-party notices, with a separate SHA-256 checksum file.
+The executable is written to `release/QuanY.exe`. Open Settings to read the embedded licenses and third-party notices. An optional SHA-256 checksum is available on the release page.
 
 - [User guide and backups](docs/guide.en.md)
 - [Contributing](CONTRIBUTING.en.md) · [Code of conduct](CODE_OF_CONDUCT.en.md)
 - [Report a vulnerability privately](SECURITY.en.md) · [Repository and release operations](docs/maintaining.en.md)
-- [v1.6.5 release notes](docs/releases/v1.6.5.en.md) · [Apache-2.0 license](LICENSE)
+- [Release history](https://github.com/la8garlic/QuanY/releases) · [Apache-2.0 license](LICENSE)

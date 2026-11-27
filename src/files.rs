@@ -1,4 +1,5 @@
 //! 正文文件和恢复稿分别保存。记录上次写出的原始字节，便于检查外部修改和沿用文本格式。
+use crate::language::tr;
 use crate::text::Text;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{
@@ -93,7 +94,11 @@ pub fn upgrade_default_folder(
 
 pub fn change_folder(db: &Connection, path: &Path) -> Result<String> {
     if !path.is_absolute() {
-        return Err("请输入完整目录，例如 D:\\写作。".into());
+        return Err(tr(
+            "请输入完整目录，例如 D:\\写作。",
+            "Enter an absolute folder path, such as D:\\Writing.",
+        )
+        .into());
     }
     fs::create_dir_all(path)?;
     NamedTempFile::new_in(path)?.close()?;
@@ -120,7 +125,7 @@ pub fn filename(title: &str) -> String {
         .collect();
     let stem = clean.trim_end_matches([' ', '.']);
     let name = if stem.is_empty() {
-        "未命名手稿"
+        tr("未命名手稿", "Untitled draft")
     } else {
         stem
     };
@@ -191,7 +196,11 @@ pub fn publish(
                 .extension()
                 .is_some_and(|s| s.eq_ignore_ascii_case("txt"))
             {
-                return Err("请选择扩展名为 .txt 的文件。".into());
+                return Err(tr(
+                    "请选择扩展名为 .txt 的文件。",
+                    "Choose a file with the .txt extension.",
+                )
+                .into());
             }
             let owner: Option<i64> = db
                 .query_row(
@@ -201,7 +210,11 @@ pub fn publish(
                 )
                 .optional()?;
             if owner.is_some_and(|n| n != id) {
-                return Err("此文件已在另一篇手稿中打开，请选择其他名称。".into());
+                return Err(tr(
+                    "此文件已在另一篇手稿中打开，请选择其他名称。",
+                    "Another draft already uses this file. Choose a different name.",
+                )
+                .into());
             }
             path.to_owned()
         }
@@ -244,18 +257,28 @@ pub fn publish(
             || p.to_string_lossy()
                 .eq_ignore_ascii_case(&target.to_string_lossy())
     });
-    let dir = target.parent().ok_or("文件缺少上级目录")?;
+    let dir = target
+        .parent()
+        .ok_or(tr("文件缺少上级目录", "The file has no parent folder"))?;
     let temp = staged(dir, &data)?;
     if let Some((_, base)) = same_link {
-        let disk = fs::read(&target)
-            .map_err(|e| format!("无法读取原文件 {}：{e}，可另存为。", target.display()))?;
+        let disk = fs::read(&target).map_err(|e| {
+            format!(
+                "{} {}: {e}",
+                tr(
+                    "无法读取原文件，可另存为。",
+                    "Could not read the original. Use Save as."
+                ),
+                target.display()
+            )
+        })?;
         if disk == data {
             bind(db, id, &target, &data)?;
             return Ok(target.to_string_lossy().into_owned());
         }
         if disk != *base {
             return Err(
-                "原文件已被其他程序修改。当前文字已保留在稿本中，请另存为，避免覆盖外部修改。"
+                tr("原文件已被其他程序修改。当前文字已保留在稿本中，请另存为，避免覆盖外部修改。", "Another application changed the file. Your edits are in the library. Use Save as to keep both copies.")
                     .into(),
             );
         }
@@ -268,7 +291,10 @@ pub fn publish(
 pub fn open(db: &mut Connection, path: &Path) -> Result<crate::storage::Desk> {
     let data = fs::read(path)?;
     let text = Text::read(&data)?;
-    let title = path.file_stem().ok_or("无法读取文件名")?.to_string_lossy();
+    let title = path
+        .file_stem()
+        .ok_or(tr("无法读取文件名", "Could not read the file name"))?
+        .to_string_lossy();
     let tx = db.transaction()?;
     let existing = tx
         .query_row(
@@ -285,7 +311,11 @@ pub fn open(db: &mut Connection, path: &Path) -> Result<crate::storage::Desk> {
                 |r| r.get(0),
             )?;
             if pending {
-                return Err("这篇手稿还有待写入的修改，请先另存为。".into());
+                return Err(tr(
+                    "这篇手稿还有待写入的修改，请先另存为。",
+                    "This draft has pending changes. Use Save as first.",
+                )
+                .into());
             }
             crate::storage::reload_body(&tx, id, &text.body)?;
             id
@@ -315,14 +345,30 @@ pub fn refresh(db: &mut Connection, id: i64) -> Result<Option<String>> {
     };
     let data = match fs::read(&path) {
         Ok(data) => data,
-        Err(e) => return Ok(Some(format!("已打开本地恢复稿。原文件无法读取：{e}"))),
+        Err(e) => {
+            return Ok(Some(format!(
+                "{} {e}",
+                tr(
+                    "已打开本地恢复稿。原文件无法读取：",
+                    "Opened the recovery copy. Could not read the original:"
+                )
+            )))
+        }
     };
     if baseline == data {
         return Ok(None);
     }
     let text = match Text::read(&data) {
         Ok(text) => text,
-        Err(e) => return Ok(Some(format!("已打开本地恢复稿。原文件解码失败：{e}"))),
+        Err(e) => {
+            return Ok(Some(format!(
+                "{} {e}",
+                tr(
+                    "已打开本地恢复稿。原文件解码失败：",
+                    "Opened the recovery copy. Could not decode the original:"
+                )
+            )))
+        }
     };
     let tx = db.transaction()?;
     crate::storage::reload_body(&tx, id, &text.body)?;

@@ -1,3 +1,4 @@
+import { t, onLanguageChange } from "./i18n";
 /** 用物理键位绑定命令，中文输入法组合期间仍由输入法接管按键。 */
 import { standby, type Bindings } from "./ipc.js";
 import { el } from "./view.js";
@@ -5,13 +6,13 @@ const defaults = {
   new:"Ctrl+N", open:"Ctrl+O", save:"Ctrl+S", saveAs:"Ctrl+Shift+S",
   find:"Ctrl+F", replace:"Ctrl+H", focus:"F8", settings:"Ctrl+,", quick:"Ctrl+Shift+J", switcher:"Ctrl+K",
 };
-const labels = {new:"新建手稿",open:"打开文件",save:"保存",saveAs:"另存为",find:"查找",replace:"替换",focus:"专注模式",settings:"设置",quick:"切换速记窗",switcher:"快速切稿"};
+const labels = {new:"新建手稿",open:"打开文件",save:"保存",saveAs:"另存为",find:"查找",replace:"替换",focus:"专注模式",settings:"设置",quick:"切换速记窗",switcher:"快速切稿"} as const;
 const targets = {new:"new",open:"open-file",save:"save-file",saveAs:"save-as",find:"find-open",replace:"find-open",focus:"focus",settings:"options",quick:"quick-toggle",switcher:"switch-open"};
 type Action = keyof typeof defaults;
 const actions = Object.keys(defaults) as Action[];
 const bindings = {...defaults};
 const info = el("standby-info");
-const message = info.textContent;
+const message = () => t("点击键位后按新组合键，Esc 取消。托盘右键可保存并退出。");
 let globalKeys: Bindings;
 let recording: Action | "summon" | "main" | null = null;
 let updating = false;
@@ -25,7 +26,7 @@ function combo(e:KeyboardEvent) {
 function keycaps(id:string, chord:string, listening:boolean) {
   const button=el<HTMLButtonElement>(id);
   button.dataset.listening=String(listening);
-  if(listening || !chord) { button.textContent=listening ? "请按组合键…" : "未分配"; return; }
+  if(listening || !chord) { button.textContent=t(listening ? "请按组合键…" : "未分配"); return; }
   const fragment=document.createDocumentFragment();
   chord.split("+").forEach((key,i)=>{
     if(i)fragment.append("+");
@@ -37,9 +38,10 @@ function keycaps(id:string, chord:string, listening:boolean) {
 function draw() {
   for (const a of actions) {
     keycaps("key-"+a,bindings[a],recording===a);
-    el(targets[a]).title = labels[a]+(bindings[a] ? "（"+bindings[a]+"）" : "");
+    el("key-"+a).previousElementSibling!.textContent = t(labels[a]);
+    el(targets[a]).title = t(labels[a])+(bindings[a] ? " ("+bindings[a]+")" : "");
   }
-  el("find-open").title = "查找（"+bindings.find+"） / 替换（"+bindings.replace+"）";
+  el("find-open").title = t("查找")+" ("+bindings.find+") / "+t("替换")+" ("+bindings.replace+")";
   keycaps("summon-key",globalKeys.quick.key,recording==="summon");
   keycaps("main-key",globalKeys.main.key,recording==="main");
   for(const hint of document.querySelectorAll<HTMLElement>("[data-shortcut]")) hint.textContent=bindings[hint.dataset.shortcut as Action];
@@ -47,21 +49,21 @@ function draw() {
 function remember() {
   for (const a of actions) localStorage.setItem("key-"+a,bindings[a]);
 }
-function record(a:typeof recording) {if(!updating){recording=a;info.textContent=message;draw();}}
+function record(a:typeof recording) {if(!updating){recording=a;info.textContent=message();draw();}}
 async function accept(key:string) {
   const a=recording;
   if(a===null || updating)return;
   if(reserved.has(key) || !key || (!key.includes("+") && (a==="summon" || a==="main" || !/^F\d+$/.test(key)))) {
-    info.textContent="请使用带修饰键的组合键或编辑器功能键，避开系统和文本编辑保留键。";return;
+    info.textContent=t("请使用带修饰键的组合键或编辑器功能键，避开系统和文本编辑保留键。");return;
   }
   if(actions.some(other=>other!==a && bindings[other]===key) || (a!=="summon"&&globalKeys.quick.key===key) || (a!=="main"&&globalKeys.main.key===key)) {
-    info.textContent="此组合键已经分配给其他操作。";return;
+    info.textContent=t("此组合键已经分配给其他操作。");return;
   }
   updating=true;
   try {
     if(a==="summon" || a==="main"){const target=a==="main"?"main":"quick";globalKeys[target]=await standby.bind(key,target); }
     else { bindings[a]=key; remember(); }
-    recording=null;info.textContent="快捷键已保存。";
+    recording=null;info.textContent=t("快捷键已保存。");
   } catch(error){info.textContent=String(error);}
   finally {updating=false;draw();}
 }
@@ -74,7 +76,7 @@ export function initKeys(keys:Bindings, startup:boolean) {
     const taken=a==="switcher" && (actions.some(other=>other!==a && bindings[other]===defaults[a]) || Object.values(keys).some(b=>b.key===defaults[a]));
     bindings[a]=saved ?? (taken ? "" : defaults[a]);
     const row=document.createElement("div"), name=document.createElement("span"), button=document.createElement("button");
-    row.className="setting";name.textContent=labels[a];button.id="key-"+a;button.className="keycap";
+    row.className="setting";button.id="key-"+a;button.className="keycap";
     button.onclick=()=>record(a);row.append(name,button);el("bindings").append(row);
   }
   const resident=el<HTMLInputElement>("resident"),login=el<HTMLInputElement>("autostart");
@@ -83,14 +85,14 @@ export function initKeys(keys:Bindings, startup:boolean) {
   login.checked=startup;
   login.onchange=async()=>{
     const wanted=login.checked;login.disabled=true;
-    try{login.checked=await standby.startup(wanted);info.textContent=login.checked?"下次登录 Windows 后将在托盘待命。":"已关闭登录启动。";}
+    try{login.checked=await standby.startup(wanted);info.textContent=t(login.checked ? "下次登录 Windows 后将在托盘待命。" : "已关闭登录启动。");}
     catch(error){login.checked=!wanted;info.textContent=String(error);}
     finally{login.disabled=false;}
   };
   el("main-key").onclick=()=>record("main");
   el("summon-key").onclick=()=>record("summon");
   el("reset-keys").onclick=()=>{
-    if(Object.values(globalKeys).some(b=>Object.values(defaults).includes(b.key))){info.textContent="全局键占用默认编辑键位，请先更换全局键。";return;}
+    if(Object.values(globalKeys).some(b=>Object.values(defaults).includes(b.key))){info.textContent=t("全局键占用默认编辑键位，请先更换全局键。");return;}
     Object.assign(bindings,defaults);remember();record(null);
   };
   el<HTMLDialogElement>("panel").addEventListener("close",()=>record(null));
@@ -101,6 +103,8 @@ export function initKeys(keys:Bindings, startup:boolean) {
     if(["Control","Alt","Shift","Meta"].includes(e.key))return;
     void accept(combo(e));
   },true);
+  info.textContent = message();
+  onLanguageChange(() => { info.textContent = message(); draw(); });
   draw();
   const issues=Object.values(keys).flatMap(b=>b.issue?[b.issue]:[]);
   if(issues.length)info.textContent=issues.join(" ");

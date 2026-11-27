@@ -1,5 +1,6 @@
 //! WebView 编辑统一使用 LF；写回文件时沿用原编码和换行约定。
 use crate::files::Result;
+use crate::language::tr;
 
 #[derive(Clone, Copy)]
 enum Encoding {
@@ -27,12 +28,21 @@ impl Text {
         };
         let text = match encoding {
             Encoding::Utf8 | Encoding::Bom => std::str::from_utf8(data)
-                .map_err(|_| "无法按 UTF-8 读取，请选用 UTF-8 或带 BOM 的 UTF-16 文本。")?
+                .map_err(|_| {
+                    tr(
+                        "无法按 UTF-8 读取，请选用 UTF-8 或带 BOM 的 UTF-16 文本。",
+                        "Use UTF-8 or UTF-16 text with a byte order mark for UTF-16.",
+                    )
+                })?
                 .to_owned(),
             Encoding::Le | Encoding::Be => {
                 let (pairs, rest) = data.as_chunks::<2>();
                 if !rest.is_empty() {
-                    return Err("UTF-16 文件末尾不完整。".into());
+                    return Err(tr(
+                        "UTF-16 文件末尾不完整。",
+                        "Incomplete UTF-16 character at the end of the file.",
+                    )
+                    .into());
                 }
                 let units: Vec<_> = pairs
                     .iter()
@@ -48,7 +58,11 @@ impl Text {
             }
         };
         if text.contains('\0') {
-            return Err("文件含空字符，请选择纯文本文件。".into());
+            return Err(tr(
+                "文件含空字符，请选择纯文本文件。",
+                "The file contains null characters. Choose a plain-text file.",
+            )
+            .into());
         }
         let newline = match text.find(['\r', '\n']).map(|i| &text[i..]) {
             Some(s) if s.starts_with("\r\n") => "\r\n",

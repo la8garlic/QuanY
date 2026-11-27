@@ -1,7 +1,13 @@
+import { onLanguageChange, t, type Message } from "./i18n";
 /** 每张便笺串行提交自己的正文；保存失败时仍可在窗口中继续编辑。 */
 import { desktop, library } from "./ipc.js";
 const text = document.querySelector<HTMLTextAreaElement>("#memo-text")!;
 const status = document.querySelector<HTMLElement>("#memo-status")!;
+let lastStatus: Message | null = "正在打开";
+function setStatus(key: Message) { lastStatus = key; status.textContent = t(key); }
+function showError(error: unknown) { lastStatus = null; status.textContent = String(error); }
+onLanguageChange(() => { if (lastStatus) setStatus(lastStatus); });
+setStatus("正在打开");
 document.documentElement.dataset.theme = localStorage.getItem("theme") === "night" ? "night" : "paper";
 let revision = 0,
   committed = 0,
@@ -13,7 +19,7 @@ async function write() {
     await library.writeMemo(text.value);
     committed = version;
   }
-  status.textContent = "已保存";
+  setStatus("已保存");
 }
 async function flush() {
   clearTimeout(timer);
@@ -24,7 +30,7 @@ async function flush() {
     await pending;
     return true;
   } catch (error) {
-    status.textContent = String(error);
+    showError(error);
     return false;
   }
 }
@@ -54,17 +60,17 @@ async function boot() {
       committed = revision;
       await desktop.destroy();
     } catch (error) {
-      status.textContent = String(error);
+      showError(error);
       text.readOnly = false;
       remove.disabled = false;
     }
   };
   text.disabled = false;
   text.focus();
-  status.textContent = "已保存";
+  setStatus("已保存");
   text.oninput = () => {
     revision++;
-    status.textContent = "待保存";
+    setStatus("待保存");
     if (revision === committed + 1) timer = window.setTimeout(() => void flush(), 350);
   };
   window.onblur = () => {
@@ -72,5 +78,5 @@ async function boot() {
   };
 }
 void boot().catch((error) => {
-  status.textContent = String(error);
+  showError(error);
 });

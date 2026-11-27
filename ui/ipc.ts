@@ -63,6 +63,7 @@ export type Bindings=Record<GlobalTarget,Binding>;
 export interface Binding {key:string;issue:string|null}
 /** 桌面设置的应答反映实际系统注册结果。 */
 export const standby = {
+  setLanguage: (english: boolean) => invoke<void>("set_language", { english }),
   read: () => invoke<{bindings:Bindings;autostart:boolean;compact:boolean}>("standby_settings"),
   startup: (enabled:boolean) => invoke<boolean>("set_autostart",{enabled}),
   bind: (key:string,target:GlobalTarget) => invoke<Binding>("bind_summon",{key,target}),

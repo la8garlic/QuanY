@@ -1,19 +1,16 @@
+import { locale, t } from "./i18n";
 import { FileText, Pin, Plus, Search, Settings2, StickyNote } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { library, type Entry, type SearchHit } from "./ipc";
 
-const shortDate = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" });
-const shortTime = new Intl.DateTimeFormat("zh-CN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function modifiedLabel(stamp: number) {
-  const time = new Date(stamp);
-  return time.toDateString() === new Date().toDateString()
-    ? "今天 · " + shortTime.format(time)
-    : shortDate.format(time) + " · " + shortTime.format(time);
+function dateLabel(language: string) {
+  const date = new Intl.DateTimeFormat(language, { month: "long", day: "numeric" });
+  const time = new Intl.DateTimeFormat(language, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return (stamp: number) => {
+    const modified = new Date(stamp);
+    const day = modified.toDateString() === new Date().toDateString() ? t("今天") : date.format(modified);
+    return day + " · " + time.format(modified);
+  };
 }
 
 interface SidebarProps {
@@ -25,8 +22,10 @@ interface SidebarProps {
   onSearch: (s: string) => void;
   onFilter: (s: string) => void;
 }
-const collate = new Intl.Collator("zh-CN", { numeric: true });
+
 export function Sidebar({ entries, current, tags, search, filter, onSearch, onFilter }: SidebarProps) {
+  const modifiedLabel = useMemo(() => dateLabel(locale), [locale]);
+  const collate = useMemo(() => new Intl.Collator(locale, { numeric: true }), [locale]);
   const [sort, setSort] = useState(() => localStorage.getItem("catalog-sort") || "recent");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState("");
@@ -71,14 +70,14 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
                 : b.modified - a.modified) ||
             b.id - a.id,
         ),
-    [entries, term, snippets, filter, sort],
+    [entries, term, snippets, filter, sort, collate],
   );
   return (
-    <aside aria-label="稿本">
+    <aside aria-label={t("稿本")}>
       <header className="brand" data-tauri-drag-region>
         <img className="brand-stamp" alt="" draggable={false} src={new URL("../assets/quany-mark.png", import.meta.url).href} />
-        <strong data-tauri-drag-region>泉涌</strong>
-        <button id="new" aria-label="新建手稿" title="新建手稿">
+        <strong data-tauri-drag-region>{t("泉涌")}</strong>
+        <button id="new" aria-label={t("新建手稿")} title={t("新建手稿")}>
           <Plus aria-hidden="true" />
         </button>
       </header>
@@ -89,21 +88,21 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
           type="search"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="搜索手稿"
-          aria-label="搜索标题或正文"
+          placeholder={t("搜索手稿")}
+          aria-label={t("搜索标题或正文")}
         />
       </label>
       <div className="catalog-controls">
         <select
-          aria-label="筛选稿本"
+          aria-label={t("筛选稿本")}
           id="catalog-filter"
           value={filter}
           onChange={(e) => onFilter(e.target.value)}
         >
-          <option value="">全部手稿</option>
-          <option value="pinned">已置顶</option>
+          <option value="">{t("全部手稿")}</option>
+          <option value="pinned">{t("已置顶")}</option>
           {tags.length > 0 && (
-            <optgroup label="标签">
+            <optgroup label={t("标签")}>
               {tags.map((t) => (
                 <option key={t} value={"tag:" + t}>
                   {t}
@@ -114,7 +113,7 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
         </select>
         <span id="total">{items.length}</span>
         <select
-          aria-label="手稿排序"
+          aria-label={t("手稿排序")}
           id="catalog-sort"
           value={sort}
           onChange={(e) => {
@@ -122,12 +121,12 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
             localStorage.setItem("catalog-sort", e.target.value);
           }}
         >
-          <option value="recent">最近编辑</option>
-          <option value="oldest">最早编辑</option>
-          <option value="title">按标题</option>
+          <option value="recent">{t("最近编辑")}</option>
+          <option value="oldest">{t("最早编辑")}</option>
+          <option value="title">{t("按标题")}</option>
         </select>
       </div>
-      <nav id="notes" aria-label="手稿列表">
+      <nav id="notes" aria-label={t("手稿列表")}>
         {term && error ? (
           <p role="alert">{error}</p>
         ) : (
@@ -139,7 +138,7 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
                 const { openManuscript } = await import("./editor");
                 await openManuscript(entry.id, term);
               }}
-              title={entry.title || "未命名手稿"}
+              title={entry.title || t("未命名手稿")}
               aria-current={entry.id === current ? "page" : undefined}
             >
               {entry.pinned ? (
@@ -147,7 +146,7 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
               ) : (
                 <FileText className="note-symbol" aria-hidden="true" />
               )}
-              <strong>{entry.title || "未命名手稿"}</strong>
+              <strong>{entry.title || t("未命名手稿")}</strong>
               <time dateTime={new Date(entry.modified).toISOString()}>
                 {modifiedLabel(entry.modified)}
               </time>
@@ -165,14 +164,14 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
             </button>
           ))
         )}
-        {!error && !items.length && <p>{filter === "pinned" ? "暂无置顶手稿" : "没有匹配的手稿"}</p>}
+        {!error && !items.length && <p>{filter === "pinned" ? t("暂无置顶手稿") : t("没有匹配的手稿")}</p>}
       </nav>
       <div className="side-tools">
         <button id="memos">
           <StickyNote aria-hidden="true" />
-          独立便笺
+          {t("独立便笺")}
         </button>
-        <button id="options" aria-haspopup="dialog" title="设置" aria-label="设置">
+        <button id="options" aria-haspopup="dialog" title={t("设置")} aria-label={t("设置")}>
           <Settings2 aria-hidden="true" />
         </button>
       </div>

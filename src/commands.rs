@@ -1,4 +1,5 @@
 //! 文件对话框授权具体路径；恢复稿先提交，文件错误与成功应答分别交给界面。
+use crate::language::tr;
 use crate::{
     files,
     storage::{self, Desk, Entry, Library, Note, Place},
@@ -37,8 +38,15 @@ fn write(db: &mut Connection, n: &Snapshot, target: Option<&Path>) -> files::Res
     } else {
         &n.title
     };
-    let path = files::publish(db, n.id, name, &n.body, target)
-        .map_err(|e| format!("恢复稿已保存，TXT 尚未写入：{e}"))?;
+    let path = files::publish(db, n.id, name, &n.body, target).map_err(|e| {
+        format!(
+            "{} {e}",
+            tr(
+                "恢复稿已保存，TXT 尚未写入：",
+                "Recovery copy saved. Could not write the TXT file:"
+            )
+        )
+    })?;
     Ok(Saved { entry, path })
 }
 
@@ -110,8 +118,8 @@ pub async fn open_text(window: Window, state: State<'_, Library>) -> Result<Opti
     let file = rfd::AsyncFileDialog::new()
         .set_parent(&window)
         .set_directory(folder)
-        .set_title("打开文本文件")
-        .add_filter("纯文本", &["txt"])
+        .set_title(tr("打开文本文件", "Open text file"))
+        .add_filter(tr("纯文本", "Plain text"), &["txt"])
         .pick_file()
         .await;
     match file {
@@ -144,8 +152,8 @@ pub async fn save_as(
         .set_parent(&window)
         .set_directory(folder)
         .set_file_name(files::filename(name))
-        .set_title("另存为")
-        .add_filter("纯文本", &["txt"])
+        .set_title(tr("另存为", "Save as"))
+        .add_filter(tr("纯文本", "Plain text"), &["txt"])
         .save_file()
         .await;
     match file {
@@ -164,7 +172,7 @@ pub async fn choose_folder(
     let file = rfd::AsyncFileDialog::new()
         .set_parent(&window)
         .set_directory(folder)
-        .set_title("选择默认保存目录")
+        .set_title(tr("选择默认保存目录", "Choose the default save folder"))
         .pick_folder()
         .await;
     match file {
@@ -190,7 +198,7 @@ pub async fn open_location(id: i64, state: State<'_, Library>) -> Result<(), Str
         let dir = match file {
             Some(path) => Path::new(&path)
                 .parent()
-                .ok_or("文件缺少上级目录")?
+                .ok_or(tr("文件缺少上级目录", "The file has no parent folder"))?
                 .to_owned(),
             None => {
                 let dir = std::path::PathBuf::from(files::folder(db)?);
@@ -199,7 +207,11 @@ pub async fn open_location(id: i64, state: State<'_, Library>) -> Result<(), Str
             }
         };
         if !dir.is_dir() {
-            return Err("此目录已移动或当前不可访问。".into());
+            return Err(tr(
+                "此目录已移动或当前不可访问。",
+                "The folder has moved or is unavailable.",
+            )
+            .into());
         }
         std::process::Command::new("explorer.exe")
             .arg(dir)

@@ -44,7 +44,7 @@ jobs:
         with:
           name: QuanY-windows-x64
           path: |
-            release/QuanY-*-windows-x64.zip
-            release/SHA256SUMS.txt
+            release/distribution/QuanY.exe
+            release/distribution/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
