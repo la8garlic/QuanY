@@ -116,11 +116,6 @@ impl Library {
              );
              CREATE TRIGGER IF NOT EXISTS clear_draft_pieces AFTER UPDATE OF body ON notes
              BEGIN DELETE FROM draft_pieces WHERE note=NEW.id; END;
-             CREATE VIEW IF NOT EXISTS manuscript_text AS SELECT id,title,label,modified,
-                 CASE WHEN EXISTS(SELECT 1 FROM draft_pieces WHERE note=n.id)
-                 THEN (SELECT group_concat(CAST(substr(CAST(n.body AS BLOB),start_byte+1,keep_bytes) AS TEXT)||addition,'' ORDER BY part)
-                       FROM draft_pieces WHERE note=n.id)
-                 ELSE body END AS body FROM notes AS n;
              CREATE TABLE IF NOT EXISTS details (
                  note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
                  pinned INTEGER NOT NULL, tags TEXT NOT NULL, goal INTEGER NOT NULL CHECK(goal>=0)
@@ -151,6 +146,9 @@ impl Library {
              );",
         )?;
         let tx = db.transaction()?;
+        if tx.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))? == 0 {
+            tx.execute_batch(include_str!("manuscript_view_v1.sql"))?;
+        }
         tx.execute(
             "INSERT OR IGNORE INTO save_options VALUES(1,?1)",
             [texts.to_string_lossy().as_ref()],
