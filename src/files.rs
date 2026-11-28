@@ -339,6 +339,8 @@ pub fn open(db: &mut Connection, path: &Path) -> Result<crate::storage::Desk> {
     };
     tx.execute("INSERT INTO links(note,path,baseline) VALUES(?1,?2,?3) ON CONFLICT(note) DO UPDATE SET baseline=excluded.baseline",
         params![id,path.to_string_lossy(),data])?;
+    // 重新打开已移除的 TXT 时复用原稿的标签、位置和版本历史。
+    tx.execute("DELETE FROM hidden_notes WHERE note=?1", [id])?;
     tx.execute("UPDATE desk SET note=?1 WHERE slot=1", [id])?;
     let desk = crate::storage::desk(&tx)?;
     tx.commit()?;

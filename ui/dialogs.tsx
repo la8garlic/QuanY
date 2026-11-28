@@ -210,16 +210,19 @@ export function Dialogs() {
         <div id="memo-items"></div>
         <button id="create-memo">{t("＋ 新建置顶便笺")}</button>
       </dialog>
-      <dialog id="confirm">
-        <h2>{t("从稿本移除这篇手稿？")}</h2>
+      <dialog id="confirm" aria-labelledby="confirm-heading" aria-describedby="confirm-text confirm-path">
+        <h2 id="confirm-heading"></h2>
         <p id="confirm-text"></p>
+        <p id="confirm-path" dir="auto"></p>
+        <label id="confirm-proof" hidden>
+          <span>{t("输入“删除”以确认")}</span>
+          <input id="confirm-word" autoComplete="off" spellCheck={false} />
+        </label>
         <form method="dialog">
           <button value="cancel" autoFocus>
             {t("取消")}
           </button>
-          <button value="delete" className="danger">
-            {t("移除手稿")}
-          </button>
+          <button id="confirm-accept" value="accept"></button>
         </form>
       </dialog>
       <Settings />

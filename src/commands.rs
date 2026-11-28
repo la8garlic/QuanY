@@ -132,12 +132,83 @@ pub async fn bookmark(id: i64, place: Place, state: State<'_, Library>) -> Resul
         .await
 }
 
-/// 移除稿本记录，已保存的 TXT 仍归用户管理。
+#[derive(Serialize)]
+pub struct RemovalTarget {
+    title: String,
+    path: Option<String>,
+}
+
+fn removal_target(db: &Connection, id: i64) -> rusqlite::Result<RemovalTarget> {
+    db.query_row(
+        "SELECT label,path FROM visible_catalog LEFT JOIN links ON note=id WHERE id=?1",
+        [id],
+        |r| {
+            Ok(RemovalTarget {
+                title: r.get(0)?,
+                path: r.get(1)?,
+            })
+        },
+    )
+}
+
 #[tauri::command]
-pub async fn delete_note(id: i64, state: State<'_, Library>) -> Result<Desk, String> {
-    state
-        .with_files(move |db| Ok(storage::delete(db, id)?))
-        .await
+pub async fn note_removal_target(
+    id: i64,
+    state: State<'_, Library>,
+) -> Result<RemovalTarget, String> {
+    query(&state, |db| Ok(removal_target(db, id)?))
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Removal {
+    Hide,
+    Delete { path: Option<String> },
+}
+
+#[tauri::command]
+pub async fn remove_note(
+    id: i64,
+    operation: Removal,
+    state: State<'_, Library>,
+) -> Result<Option<Desk>, String> {
+    state.with_files(move |db| {
+        if matches!(operation, Removal::Hide) {
+            // 老稿本可能只有本地正文。先完成待写 TXT，移除后仍可从文件打开。
+            let pending: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM outbox WHERE note=?1)
+                OR (NOT EXISTS(SELECT 1 FROM links WHERE note=?1) AND EXISTS(
+                    SELECT 1 FROM notes WHERE id=?1 AND (title<>'' OR body<>'')))", [id], |r| r.get(0))?;
+            if pending { publish(db, id, None)?; }
+        }
+        let tx = db.transaction()?;
+        let target = removal_target(&tx, id)?;
+        let switched = storage::move_off_note(&tx, id)?;
+        let disk_path = match operation {
+            Removal::Hide => {
+                tx.execute("INSERT INTO hidden_notes(note) VALUES(?1)", [id])?;
+                None
+            }
+            Removal::Delete { path } => {
+                if target.path != path {
+                    return Err(tr("关联文件已改变，请重新确认。", "The linked file changed. Confirm again.").into());
+                }
+                if let Some(path) = &target.path {
+                    let disk = std::fs::read(path)?;
+                    let same: bool = tx.query_row("SELECT baseline=?1 FROM links WHERE note=?2",
+                        rusqlite::params![disk, id], |r| r.get(0))?;
+                    if !same { return Err(tr("原文件已被外部修改，请重新打开核对后再删除。",
+                        "The file changed on disk. Reopen it and review the changes before deleting.").into()); }
+                }
+                tx.execute("DELETE FROM notes WHERE id=?1", [id])?;
+                target.path
+            }
+        };
+        let next = switched.then(|| storage::desk(&tx)).transpose()?;
+        // 删除失败会回滚稿本事务；提交之前始终保留可恢复的本地正文。
+        if let Some(path) = disk_path { std::fs::remove_file(path)?; }
+        tx.commit()?;
+        Ok(next)
+    }).await
 }
 
 /// 由系统选择现有 TXT，并将当前稿件与原文件关联。

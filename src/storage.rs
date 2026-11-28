@@ -142,6 +142,9 @@ impl Library {
                  path TEXT NOT NULL UNIQUE COLLATE NOCASE, baseline BLOB NOT NULL
              );
              CREATE TABLE IF NOT EXISTS outbox (note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE);
+             CREATE TABLE IF NOT EXISTS hidden_notes (note INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE);
+             CREATE VIEW IF NOT EXISTS visible_catalog AS
+                 SELECT * FROM catalog WHERE id NOT IN (SELECT note FROM hidden_notes);
              CREATE TABLE IF NOT EXISTS save_options (slot INTEGER PRIMARY KEY CHECK(slot=1), folder TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS desk (
                  slot INTEGER PRIMARY KEY CHECK(slot=1), note INTEGER NOT NULL REFERENCES notes(id)
@@ -183,7 +186,7 @@ pub fn desk(db: &Connection) -> rusqlite::Result<Desk> {
     let note = read_note(db, id)?;
     // 稿本列表只读索引信息，打开一本长稿不会把其他稿件的正文带入界面。
     let mut query = db.prepare(
-        "SELECT id,label,modified,pinned,tags,goal FROM catalog ORDER BY modified DESC,id DESC",
+        "SELECT id,label,modified,pinned,tags,goal FROM visible_catalog ORDER BY modified DESC,id DESC",
     )?;
     let entries = query
         .query_map([], entry)?
@@ -324,23 +327,24 @@ pub fn stage(db: &mut Connection, note: &crate::commands::DraftEdits) -> crate::
     Ok(())
 }
 
-pub fn delete(db: &mut Connection, id: i64) -> rusqlite::Result<Desk> {
-    let tx = db.transaction()?;
+/// 操作后台稿件时保持当前编辑器和撤销栈；最后一篇移走后创建空白稿。
+pub fn move_off_note(tx: &Connection, id: i64) -> rusqlite::Result<bool> {
+    let active: i64 = tx.query_row("SELECT note FROM desk WHERE slot=1", [], |r| r.get(0))?;
+    if active != id {
+        return Ok(false);
+    }
     let next = tx
         .query_row(
-            "SELECT id FROM notes WHERE id<>?1 ORDER BY modified DESC,id DESC LIMIT 1",
+            "SELECT id FROM visible_catalog WHERE id<>?1 ORDER BY modified DESC,id DESC LIMIT 1",
             [id],
             |r| r.get::<_, i64>(0),
         )
         .optional()?;
     let next = match next {
         Some(next) => next,
-        None => insert(&tx, "", "")?,
+        None => insert(tx, "", "")?,
     };
     // 切换到相邻稿件和删除必须一起成功，恢复窗口时始终有一篇有效稿件。
     tx.execute("UPDATE desk SET note=?1 WHERE slot=1", [next])?;
-    tx.execute("DELETE FROM notes WHERE id=?1", [id])?;
-    let result = desk(&tx)?;
-    tx.commit()?;
-    Ok(result)
+    Ok(true)
 }

@@ -35,6 +35,8 @@ Choose 0.65, 2 or 5 seconds of inactivity before autosave. The default folder co
 
 A TXT contains the body. The SQLite library holds titles, tags, pins, revisions and memos. For a backup, exit from the tray and copy both your manuscript folders and `%LOCALAPPDATA%\cn.jianji.writer`. This internal identifier predates the public name. Include files you have opened or saved outside the default folder.
 
+Right-click a manuscript in the sidebar and choose **Remove from library…** to hide it. Reopening the same TXT restores its tags and revision history. **Permanently delete…** deletes the linked TXT, recovery copy and revision history. Check the path, choose **Continue to delete**, then type `DELETE` and confirm. Press Esc at either step to cancel.
+
 ## Updating and troubleshooting
 
 Exit normally and replace your executable with the new QuanY.exe. If you move the executable while sign-in startup is enabled, disable startup first, launch from the new location and enable it again. When reporting a problem, include the app and Windows versions, reproduction steps and what happens with a blank sample. Redact filenames, account paths and manuscript contents from screenshots.

@@ -50,7 +50,9 @@ export const library = {
   stage: (note: DraftEdits) => invoke<void>("stage_note", {note}),
   publish: (id: number) => invoke<Saved>("publish_note", {id}),
   bookmark: (id: number, place: Place) => invoke<void>("bookmark", { id, place }),
-  remove: (id: number) => invoke<Desk>("delete_note", { id }),
+  removalTarget: (id: number) => invoke<{title: string; path: string | null}>("note_removal_target", {id}),
+  remove: (id: number, operation: {kind: "hide"} | {kind: "delete"; path: string | null}) =>
+    invoke<Desk | null>("remove_note", {id, operation}),
   hasShellFiles: () => invoke<boolean>("has_shell_files"),
   openNextTxt: () => invoke<Desk | null>("open_next_txt"),
   open: () => invoke<Desk|null>("open_text"),
