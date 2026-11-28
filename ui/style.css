@@ -578,6 +578,23 @@ main {
   width: 228px;
   border-radius: 12px;
 }
+.note-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 5px;
+  min-width: 150px;
+  color: var(--ink);
+  background: var(--control);
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 22px #211b1529;
+}
+.note-menu button { width: 100%; display: flex; align-items: center; justify-content: flex-start; gap: 9px; padding: 6px 10px; }
+.note-menu svg { width: 16px; height: 16px; }
+#confirm-path { overflow-wrap: anywhere; user-select: text; color: var(--muted); }
+#confirm-path:empty { display: none; }
+#confirm-proof:not([hidden]) { display: grid; gap: 5px; margin-block: 12px; }
 #file-menu button {
   width: 100%;
   justify-content: flex-start;

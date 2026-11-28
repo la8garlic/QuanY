@@ -313,19 +313,45 @@ el("save-as").onclick = () => action(async () => {
   }
   writing.focus();
 }, false);
-el("remove").onclick = () => {
-  if (!ready || busy) return;
-
-  el("confirm-text").textContent = t("“{title}” 将从稿本移除。已保存的 TXT 文件会保留。").replace("{title}", () => title.value.trim() || writing.state.doc.sliceString(0, 32).trim() || untitled());
+function confirmRemoval(name: string, linkedPath: string | null, kind: "hide" | "delete", final = false) {
+  const deleting = kind === "delete";
+  el("confirm-heading").textContent = t(final ? "确认永久删除？" : deleting ? "删除这篇手稿？" : "从稿本移除这篇手稿？");
+  const message = deleting
+    ? linkedPath ? "将永久删除“{title}”的 TXT 文件、恢复稿及版本历史。" : "“{title}”没有关联 TXT，将永久删除本地手稿和版本历史。"
+    : linkedPath ? "“{title}” 将从稿本移除。已保存的 TXT 文件会保留。" : "移除“{title}”？有内容的本地稿会先保存为 TXT。";
+  el("confirm-text").textContent = t(message).replace("{title}", () => name) + (final ? " " + t("此操作无法撤销，请核对手稿和路径。") : "");
+  el("confirm-path").textContent = linkedPath;
+  el("confirm-proof").hidden = !final;
+  const word = el<HTMLInputElement>("confirm-word"), accept = el<HTMLButtonElement>("confirm-accept");
+  word.value = "";
+  accept.textContent = t(final ? "永久删除" : deleting ? "继续删除" : "移除手稿");
+  accept.classList.toggle("danger", deleting);
+  accept.disabled = final;
+  word.oninput = () => { accept.disabled = word.value.trim() !== t("删除"); };
   confirm.returnValue = "cancel";
+  const answer = new Promise<boolean>(resolve => confirm.addEventListener("close",
+    () => resolve(confirm.returnValue === "accept" && (!final || word.value.trim() === t("删除"))), {once: true}));
   confirm.showModal();
-};
-confirm.onclose = () => {
-  if (confirm.returnValue === "delete") void action(async () => {
-    show(await library.remove(current));
+  if (final) word.focus();
+  return answer;
+}
+export function removeManuscript(id: number, kind: "hide" | "delete") {
+  return action(async () => {
+    const target = await library.removalTarget(id);
+    const name = target.title || untitled();
+    if (!await confirmRemoval(name, target.path, kind)) return;
+    if (kind === "delete" && !await confirmRemoval(name, target.path, kind, true)) return;
+    const next = await library.remove(id, kind === "hide" ? {kind} : {kind, path: target.path});
+    if (next) show(next);
+    else {
+      entries = entries.filter(entry => entry.id !== id);
+      publish(entries, current, false);
+      updateReference();
+    }
     writing.focus();
-  });
-};
+  }, id === current);
+}
+el("remove").onclick = () => removeManuscript(current, "hide");
 
 function isQuick() { return document.body.classList.contains("quick"); }
 function quickLayout(on:boolean) {

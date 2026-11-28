@@ -1,6 +1,6 @@
 import { locale, t } from "./i18n";
-import { FileText, Pin, Plus, Search, Settings2, StickyNote } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArchiveX, FileText, Pin, Plus, Search, Settings2, StickyNote, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { library, type Entry, type SearchHit } from "./ipc";
 
 function dateLabel(language: string) {
@@ -30,6 +30,23 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState("");
   const term = search.trim();
+  const menu = useRef<HTMLDivElement>(null);
+  const menuTarget = useRef<HTMLButtonElement>(null);
+  function showMenu(row: HTMLButtonElement, x: number, y: number) {
+    const popup = menu.current!;
+    menuTarget.current = row;
+    popup.showPopover();
+    popup.style.left = Math.max(4, Math.min(x, innerWidth - popup.offsetWidth - 4)) + "px";
+    popup.style.top = Math.max(4, Math.min(y, innerHeight - popup.offsetHeight - 4)) + "px";
+    popup.querySelector("button")!.focus();
+  }
+  async function choose(kind: "hide" | "delete") {
+    // 在菜单关闭前固定右击的行；当前打开的手稿可能是另一篇。
+    const id = Number(menuTarget.current!.dataset.id);
+    menu.current!.hidePopover();
+    const { removeManuscript } = await import("./editor");
+    await removeManuscript(id, kind);
+  }
 
   useEffect(() => {
     if (!term) return;
@@ -134,6 +151,18 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
             <button
               key={entry.id}
               data-id={entry.id}
+              aria-haspopup="menu"
+              onContextMenu={e => {
+                e.preventDefault();
+                showMenu(e.currentTarget, e.clientX, e.clientY);
+              }}
+              onKeyDown={e => {
+                if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  showMenu(e.currentTarget, rect.left + 10, rect.bottom);
+                }
+              }}
               onClick={async () => {
                 const { openManuscript } = await import("./editor");
                 await openManuscript(entry.id, term);
@@ -166,6 +195,21 @@ export function Sidebar({ entries, current, tags, search, filter, onSearch, onFi
         )}
         {!error && !items.length && <p>{filter === "pinned" ? t("暂无置顶手稿") : t("没有匹配的手稿")}</p>}
       </nav>
+      <div className="note-menu" ref={menu} popover="auto" role="menu" aria-label={t("手稿操作")}
+        onKeyDown={e => {
+          if (e.key === "Escape" || e.key === "Tab") {
+            menu.current!.hidePopover();
+            menuTarget.current!.focus();
+          } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            const buttons = e.currentTarget.querySelectorAll("button");
+            buttons[document.activeElement === buttons[0] ? 1 : 0]!.focus();
+          } else return;
+          if (e.key !== "Tab") e.preventDefault();
+          e.stopPropagation();
+        }}>
+        <button role="menuitem" onClick={() => void choose("hide")}><ArchiveX />{t("移出稿本…")}</button>
+        <button role="menuitem" className="danger" onClick={() => void choose("delete")}><Trash2 />{t("永久删除…")}</button>
+      </div>
       <div className="side-tools">
         <button id="memos">
           <StickyNote aria-hidden="true" />

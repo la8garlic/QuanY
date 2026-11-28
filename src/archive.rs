@@ -48,7 +48,8 @@ pub async fn search_notes(term: String, state: State<'_, Library>) -> Result<Vec
         .map_err(|e| e.to_string())?;
     query(&state, |db| {
         let mut stmt = db.prepare(
-            "SELECT id,label,modified,title,body FROM manuscript_text ORDER BY modified DESC,id DESC",
+            "SELECT id,label,modified,title,body FROM manuscript_text
+             WHERE id NOT IN (SELECT note FROM hidden_notes) ORDER BY modified DESC,id DESC",
         )?;
         let mut rows = stmt.query([])?;
         let mut hits = Vec::new();
